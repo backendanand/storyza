@@ -18,10 +18,10 @@ export interface AssetItem {
   thumbnail_url: string | null
 }
 
-const TABS: { key: SceneObjectKind; label: string }[] = [
-  { key: 'character', label: 'Characters' },
-  { key: 'prop', label: 'Props' },
-  { key: 'background', label: 'Backgrounds' },
+const TABS: { key: SceneObjectKind; label: string; emoji: string }[] = [
+  { key: 'character', label: 'Characters', emoji: '🧑‍🎤' },
+  { key: 'prop', label: 'Props', emoji: '⭐' },
+  { key: 'background', label: 'Backdrops', emoji: '🖼️' },
 ]
 
 export function AssetPalette() {
@@ -41,34 +41,48 @@ export function AssetPalette() {
   )
 
   return (
-    <div className="flex w-56 shrink-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3">
+    <div className="flex h-full w-56 shrink-0 flex-col gap-3 rounded-3xl border-2 border-white bg-white p-4 shadow-soft">
+      <div className="flex items-center gap-2">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-100 text-lg" aria-hidden>
+          🧸
+        </span>
+        <h2 className="font-display text-lg text-slate-900">Stickers</h2>
+      </div>
+
       <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search"
-          className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2 text-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none"
+          placeholder="Search stickers"
+          className="h-10 w-full rounded-full border-2 border-slate-100 bg-slate-50 pr-3 pl-9 text-sm transition-colors focus:border-brand-300 focus:ring-2 focus:ring-brand-100 focus:outline-none"
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-1">
+      <div className="grid grid-cols-3 gap-1.5">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={cn(
-              'rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors',
-              tab === t.key ? 'bg-brand-100 text-brand-800' : 'text-slate-500 hover:bg-slate-100',
+              'flex flex-col items-center gap-0.5 rounded-2xl px-1 py-2 text-[11px] font-bold transition-all',
+              tab === t.key
+                ? 'bg-brand-600 text-white shadow-lift'
+                : 'text-slate-500 hover:bg-brand-50 hover:text-brand-700',
             )}
           >
+            <span className="text-base" aria-hidden>
+              {t.emoji}
+            </span>
             {t.label}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {isLoading && <p className="p-3 text-xs text-slate-400">Loading…</p>}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {isLoading && (
+          <p className="p-4 text-center text-xs font-semibold text-slate-400">Loading stickers…</p>
+        )}
         <div className="grid grid-cols-2 gap-2">
           {assets.map((asset) => (
             <button
@@ -85,20 +99,25 @@ export function AssetPalette() {
                   })
                 }
               }}
-              className="flex flex-col items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 p-2 transition-colors hover:border-brand-300 hover:bg-brand-50"
+              className="group flex flex-col items-center gap-1.5 rounded-2xl border-2 border-slate-100 bg-slate-50 p-2.5 transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50 hover:shadow-soft"
             >
               <img
                 src={asset.media_url}
                 alt={asset.name}
-                className={asset.kind === 'background' ? 'aspect-video w-full rounded object-cover' : 'h-12 w-12 object-contain'}
+                className={cn(
+                  'transition-transform group-hover:scale-110',
+                  asset.kind === 'background' ? 'aspect-video w-full rounded-xl object-cover' : 'h-14 w-14 object-contain',
+                )}
               />
-              <span className="w-full truncate text-center text-[11px] font-medium text-slate-600">
+              <span className="w-full truncate text-center text-[11px] font-bold text-slate-600">
                 {asset.name}
               </span>
             </button>
           ))}
           {!isLoading && assets.length === 0 && (
-            <p className="col-span-2 p-3 text-center text-xs text-slate-400">No {tab}s found</p>
+            <p className="col-span-2 p-4 text-center text-xs font-semibold text-slate-400">
+              No stickers here yet!
+            </p>
           )}
         </div>
       </div>

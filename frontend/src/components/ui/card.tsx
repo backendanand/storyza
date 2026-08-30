@@ -2,23 +2,39 @@ import * as React from 'react'
 
 import { cn } from '../../lib/utils'
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+type CardAccent = 'brand' | 'sunny' | 'coral' | 'mint' | 'grape'
+
+const accents: Record<CardAccent, string> = {
+  brand: 'bg-brand-400',
+  sunny: 'bg-sunny-400',
+  coral: 'bg-coral-400',
+  mint: 'bg-mint-400',
+  grape: 'bg-grape-400',
+}
+
+export function Card({
+  className,
+  accent,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { accent?: CardAccent }) {
   return (
     <div
-      className={cn('rounded-2xl border border-slate-200 bg-white shadow-sm', className)}
+      className={cn('overflow-hidden rounded-3xl border-2 border-white bg-white shadow-soft', className)}
       {...props}
-    />
+    >
+      {accent && <div className={cn('h-1.5 w-full', accents[accent])} />}
+      {children}
+    </div>
   )
 }
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('flex flex-col gap-1 p-6', className)} {...props} />
+  return <div className={cn('flex flex-col gap-1.5 p-6', className)} {...props} />
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return (
-    <h3 className={cn('text-lg font-bold text-slate-900', className)} {...props} />
-  )
+  return <h3 className={cn('font-display text-xl text-slate-900', className)} {...props} />
 }
 
 export function CardDescription({

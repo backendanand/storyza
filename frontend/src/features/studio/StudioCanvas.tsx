@@ -46,6 +46,7 @@ export function StudioCanvas() {
   const endDrag = useStudioStore((s) => s.endDrag)
   const playedAudioRef = useRef<Set<string>>(new Set())
   const playheadRef = useRef(0)
+  const canvasRoRef = useRef<ResizeObserver | null>(null)
 
   useEffect(() => {
     playheadRef.current = playheadTime
@@ -70,6 +71,14 @@ export function StudioCanvas() {
         }
         initialized = true
         mount.appendChild(app.canvas)
+
+        const syncCanvasWidth = () => {
+          const rect = app.canvas.getBoundingClientRect()
+          document.documentElement.style.setProperty('--canvas-w', `${Math.round(rect.width)}px`)
+        }
+        syncCanvasWidth()
+        canvasRoRef.current = new ResizeObserver(syncCanvasWidth)
+        canvasRoRef.current.observe(app.canvas)
 
         app.stage.eventMode = 'static'
         app.stage.hitArea = app.screen
@@ -96,6 +105,8 @@ export function StudioCanvas() {
 
     return () => {
       cancelled = true
+      canvasRoRef.current?.disconnect()
+      canvasRoRef.current = null
       if (initialized) {
         void app.destroy(true, { children: true })
       }
@@ -222,13 +233,15 @@ export function StudioCanvas() {
   const selected = selectObject(scene, selectedId)
 
   return (
-    <div className="flex flex-col gap-3">
-      <div ref={mountRef} className="rounded-xl ring-1 ring-slate-200 bg-sky-300/40" />
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2rem] border-2 border-white bg-gradient-to-b from-sky-100 to-brand-50 p-3 shadow-soft">
+        <div ref={mountRef} className="studio-canvas-mount" />
+      </div>
       {selected && (
-        <p className="text-xs text-slate-500">
-          Selected: <span className="font-semibold text-slate-700">{selected.name}</span> · x{' '}
-          {selected.x.toFixed(0)} · y {selected.y.toFixed(0)} · {selected.rotation}° · scale{' '}
-          {selected.scale.toFixed(2)} · playhead {playheadTime.toFixed(1)}s
+        <p className="shrink-0 rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-soft">
+          Selected: <span className="font-display text-sm font-semibold text-slate-800">{selected.name}</span>
+          <span className="text-slate-300"> · </span>x {selected.x.toFixed(0)} · y {selected.y.toFixed(0)} ·{' '}
+          {selected.rotation}° · size {selected.scale.toFixed(2)} · {playheadTime.toFixed(1)}s
         </p>
       )}
     </div>

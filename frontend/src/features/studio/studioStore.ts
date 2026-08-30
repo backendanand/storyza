@@ -40,6 +40,18 @@ export interface SceneBackground {
   mediaUrl: string
 }
 
+export type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+
+let saveNowHandler: (() => void) | null = null
+
+export function registerSaveHandler(handler: (() => void) | null) {
+  saveNowHandler = handler
+}
+
+export function triggerSaveNow() {
+  saveNowHandler?.()
+}
+
 interface StudioState {
   title: string
   projectId: string | null
@@ -52,9 +64,13 @@ interface StudioState {
   isPlaying: boolean
   playheadTime: number
   recording: boolean
+  saveState: SaveState
+  saveError: string | null
 
   setTitle: (title: string) => void
   setProjectId: (projectId: string | null) => void
+  setSaveState: (state: SaveState) => void
+  setSaveError: (error: string | null) => void
   setScene: (scene: StudioScene, projectId?: string | null) => void
   loadDocument: (input: {
     title: string
@@ -113,10 +129,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   isPlaying: false,
   playheadTime: 0,
   recording: false,
+  saveState: 'idle',
+  saveError: null,
 
   setTitle: (title) => set({ title }),
 
   setProjectId: (projectId) => set({ projectId }),
+
+  setSaveState: (saveState) => set({ saveState }),
+  setSaveError: (saveError) => set({ saveError }),
 
   setScene: (scene, projectId = null) =>
     set({
@@ -338,6 +359,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       isPlaying: false,
       playheadTime: 0,
       recording: false,
+      saveState: 'idle',
+      saveError: null,
     }),
 }))
 

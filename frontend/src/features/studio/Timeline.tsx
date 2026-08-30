@@ -1,5 +1,19 @@
 import { useRef, useState } from 'react'
-import { Mic, Plus, Trash2, Volume2, X } from 'lucide-react'
+import {
+  ArrowRightLeft,
+  ArrowUpDown,
+  ChevronDown,
+  Expand,
+  Eye,
+  Mic,
+  Plus,
+  Play,
+  RotateCw,
+  Trash2,
+  Volume2,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 
 import { cn } from '../../lib/utils'
 import { playClip, recordVoice, type SfxPreset } from './audio/sfx'
@@ -7,16 +21,16 @@ import { selectObject, useStudioStore, tracksForObject } from './studioStore'
 import { trackDuration, type AudioClip, type TrackProperty } from './types'
 
 const PX_PER_SEC = 80
-const ROW_HEIGHT = 26
-const PROPERTIES: { key: TrackProperty; label: string; color: string }[] = [
-  { key: 'x', label: 'Move X', color: '#f59e0b' },
-  { key: 'y', label: 'Move Y', color: '#22c55e' },
-  { key: 'rotation', label: 'Turn', color: '#8b5cf6' },
-  { key: 'scale', label: 'Size', color: '#3b82f6' },
-  { key: 'visible', label: 'Show / Hide', color: '#ef4444' },
+const ROW_HEIGHT = 24
+const PROPERTIES: { key: TrackProperty; label: string; color: string; icon: LucideIcon }[] = [
+  { key: 'x', label: 'Slide', color: '#f0a800', icon: ArrowRightLeft },
+  { key: 'y', label: 'Lift', color: '#22c55e', icon: ArrowUpDown },
+  { key: 'rotation', label: 'Turn', color: '#8b5cf6', icon: RotateCw },
+  { key: 'scale', label: 'Size', color: '#369bff', icon: Expand },
+  { key: 'visible', label: 'Show / Hide', color: '#ff6b81', icon: Eye },
 ]
 
-export function Timeline() {
+export function Timeline({ onClose }: { onClose?: () => void }) {
   const rulerRef = useRef<HTMLDivElement>(null)
   const dragSeekRef = useRef(false)
   const keyframeDragRef = useRef<{ trackId: string; currentTime: number } | null>(null)
@@ -125,46 +139,61 @@ export function Timeline() {
   const seconds = Array.from({ length: Math.ceil(duration) }, (_, i) => i + 1)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
+    <div
+      className="rounded-3xl border-2 border-white bg-white p-2.5 shadow-soft"
+      style={{ width: 'var(--canvas-w, 100%)' }}
+    >
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setRecording(!recording)}
           className={cn(
-            'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
-            recording ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+            'flex h-9 items-center gap-2 rounded-full px-4 text-sm font-bold transition-colors',
+            recording ? 'bg-coral-500 text-white shadow-candy' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
           )}
         >
-          <span className={cn('h-2 w-2 rounded-full', recording ? 'animate-pulse bg-white' : 'bg-slate-400')} />
-          {recording ? 'Recording…' : 'Record'}
+          <span className={cn('h-2.5 w-2.5 rounded-full', recording ? 'animate-pulse bg-white' : 'bg-coral-500')} />
+          {recording ? 'Recording…' : 'Record 🎬'}
         </button>
         {selected && (
-          <span className="text-xs text-slate-500">
-            Animating: <span className="font-semibold text-slate-700">{selected.name}</span>
+          <span className="flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand-800">
+            Animating: <span className="text-brand-700">{selected.name}</span>
           </span>
         )}
-        <button
-          onClick={() => {
-            if (selectedKeyframe) {
-              deleteKeyframe(selectedKeyframe.trackId, selectedKeyframe.time)
-            }
-          }}
-          disabled={!selectedKeyframe}
-          className="ml-auto flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40"
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Delete keyframe
-        </button>
-        <button
-          onClick={addSfx}
-          className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
-        >
-          <Volume2 className="h-3.5 w-3.5" /> + SFX
-        </button>
-        <button
-          onClick={() => void addVoice()}
-          className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
-        >
-          <Mic className="h-3.5 w-3.5" /> + Voice
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={addSfx}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-slate-100 px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+          >
+            <Volume2 className="h-4 w-4" /> SFX 🔊
+          </button>
+          <button
+            onClick={() => void addVoice()}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-slate-100 px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+          >
+            <Mic className="h-4 w-4" /> Voice 🎙️
+          </button>
+          <button
+            onClick={() => {
+              if (selectedKeyframe) {
+                deleteKeyframe(selectedKeyframe.trackId, selectedKeyframe.time)
+              }
+            }}
+            disabled={!selectedKeyframe}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-slate-100 px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-40"
+          >
+            <Trash2 className="h-4 w-4" /> Remove
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Collapse movie strip"
+              title="Collapse movie strip"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -177,11 +206,11 @@ export function Timeline() {
           onPointerLeave={stopSeek}
         >
           {/* ruler */}
-          <div ref={rulerRef} className="relative h-6 border-b border-slate-200 bg-slate-50">
+          <div ref={rulerRef} className="relative h-5 rounded-t-xl border-b border-slate-100 bg-brand-50/60">
             {seconds.map((s) => (
               <span
                 key={s}
-                className="absolute top-1.5 text-[10px] text-slate-400"
+                className="absolute top-1 text-[10px] font-bold text-slate-400"
                 style={{ left: s * PX_PER_SEC }}
               >
                 {s}s
@@ -190,27 +219,23 @@ export function Timeline() {
           </div>
 
           {/* audio strip */}
-          <div className="relative h-8 border-b border-slate-100 bg-indigo-50/40">
+          <div className="relative h-7 border-b border-slate-100 bg-grape-50/60">
             {audio.map((clip) => (
               <div
                 key={clip.id}
-                className="group absolute top-1 flex h-6 items-center gap-1 rounded bg-indigo-500 px-1.5 text-[10px] font-semibold text-white"
+                className="group absolute top-0.5 flex h-6 items-center gap-1 rounded-full bg-grape-500 px-2 text-[10px] font-bold text-white"
                 style={{
                   left: clip.startTime * PX_PER_SEC,
                   width: Math.max(40, clip.duration * PX_PER_SEC),
                 }}
               >
-                <button
-                  onClick={() => playClip(clip)}
-                  className="hover:text-indigo-100"
-                  title="Preview"
-                >
-                  ▶
+                <button onClick={() => playClip(clip)} className="hover:text-grape-200" title="Preview">
+                  <Play className="h-2.5 w-2.5 fill-current" />
                 </button>
                 <span className="truncate">{clip.kind === 'voice' ? '🎤 Voice' : '🔊 SFX'}</span>
                 <button
                   onClick={() => removeAudio(clip.id)}
-                  className="ml-auto hidden hover:text-indigo-100 group-hover:block"
+                  className="ml-auto hidden hover:text-grape-200 group-hover:block"
                   title="Remove"
                 >
                   <X className="h-3 w-3" />
@@ -223,24 +248,26 @@ export function Timeline() {
           <div className="flex flex-col">
             {PROPERTIES.map((prop) => {
               const track = selectedTracks.find((t) => t.property === prop.key)
+              const Icon = prop.icon
               return (
                 <div
                   key={prop.key}
                   className="relative border-b border-slate-100"
                   style={{ height: ROW_HEIGHT }}
                 >
-                  <span className="absolute left-0 top-1/2 z-10 -translate-y-1/2 bg-white pr-2 text-[10px] font-medium text-slate-400">
+                  <span className="absolute top-1/2 left-0 z-10 flex -translate-y-1/2 items-center gap-1 rounded-full bg-white pr-2 text-[11px] font-bold text-slate-500">
+                    <Icon className="h-3.5 w-3.5" style={{ color: prop.color }} />
                     {prop.label}
                   </span>
                   <button
                     onClick={() => selected && addKeyframeAtPlayhead(selected.id, prop.key)}
-                    className="absolute right-0 top-1/2 z-10 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                    title="Add keyframe at playhead"
+                    className="absolute top-1/2 right-0 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                    title="Add a key moment at the playhead"
                     disabled={!selected}
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Plus className="h-4 w-4" />
                   </button>
-                  <div className="absolute inset-x-0 bottom-0 top-0 mx-8">
+                  <div className="absolute inset-x-0 bottom-0 top-0 mx-10">
                     {track?.keyframes.map((kf) => {
                       const isSelected =
                         selectedKeyframe?.trackId === track.id &&
@@ -251,8 +278,8 @@ export function Timeline() {
                           onPointerDown={(e) => startKeyframeDrag(e, track.id, kf.t)}
                           onClick={() => selectKeyframe(track.id, kf.t)}
                           className={cn(
-                            'absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow',
-                            isSelected ? 'ring-2 ring-slate-700' : 'hover:scale-125',
+                            'absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-soft transition-transform',
+                            isSelected ? 'scale-125 ring-2 ring-slate-700' : 'hover:scale-125',
                           )}
                           style={{ left: kf.t * PX_PER_SEC, background: prop.color }}
                           title={`${prop.label} @ ${kf.t.toFixed(1)}s = ${String(kf.value)}`}
@@ -267,22 +294,24 @@ export function Timeline() {
 
           {/* playhead */}
           <div
-            className="pointer-events-none absolute top-0 bottom-0 z-30 w-0.5 bg-slate-700"
+            className="pointer-events-none absolute top-0 bottom-0 z-30 w-0.5 bg-coral-500"
             style={{ left: playheadTime * PX_PER_SEC }}
           >
-            <div className="absolute -left-1 -top-0.5 h-3 w-2.5 rounded-t bg-slate-700" />
+            <div className="absolute -top-0.5 -left-1 h-3 w-2.5 rounded-t bg-coral-500" />
           </div>
         </div>
       </div>
 
-      {recordingNotice && <p className="mt-2 text-xs text-amber-700">{recordingNotice}</p>}
+      {recordingNotice && <p className="mt-2 text-xs font-semibold text-sunny-800">{recordingNotice}</p>}
       {recording && (
-        <p className="mt-2 text-xs text-slate-500">
-          Recording is on — move, turn or resize objects to place keyframes at the playhead.
+        <p className="mt-2 text-xs font-semibold text-slate-500">
+          Recording is on — move, turn or resize objects to add key moments.
         </p>
       )}
       {!selected && (
-        <p className="mt-2 text-xs text-slate-400">Select an object on the canvas to animate it.</p>
+        <p className="mt-2 text-xs font-semibold text-slate-400">
+          Pick an object on the stage to animate it. ✨
+        </p>
       )}
     </div>
   )
