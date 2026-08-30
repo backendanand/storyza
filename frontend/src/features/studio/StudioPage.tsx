@@ -1,15 +1,14 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Clapperboard,
   FlipHorizontal2,
+  History,
   Loader2,
   Play,
   Save,
   Square,
   Trash2,
-  UserRound,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -18,9 +17,11 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { apiClient } from '../../lib/api'
 import { useAuthStore } from '../../stores/auth'
+import { AssetPalette, type AssetItem } from './AssetPalette'
 import { StudioCanvas } from './StudioCanvas'
+import { Timeline } from './Timeline'
 import { useStudioStore } from './studioStore'
-import type { ProjectDocument } from './types'
+import { fromProjectDocument, toProjectDocument, type ProjectDocument } from './types'
 
 interface ProjectRead {
   id: string
@@ -33,6 +34,15 @@ interface ProjectDetail extends ProjectRead {
   document: ProjectDocument | null
 }
 
+interface ProjectVersion {
+  id: string
+  version: number
+  renderer_version: string
+  created_at: string | null
+}
+
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+
 export function StudioPage() {
   const user = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
@@ -40,19 +50,21 @@ export function StudioPage() {
   const title = useStudioStore((s) => s.title)
   const setTitle = useStudioStore((s) => s.setTitle)
   const projectId = useStudioStore((s) => s.projectId)
-  const setProjectId = useStudioStore((s) => s.setProjectId)
-  const scene = useStudioStore((s) => s.scene)
-  const addObject = useStudioStore((s) => s.addObject)
+  const isPlaying = useStudioStore((s) => s.isPlaying)
+  const togglePlay = useStudioStore((s) => s.togglePlay)
   const rotateSelected = useStudioStore((s) => s.rotateSelected)
   const scaleSelected = useStudioStore((s) => s.scaleSelected)
   const removeSelected = useStudioStore((s) => s.removeSelected)
-  const isPlaying = useStudioStore((s) => s.isPlaying)
-  const togglePlay = useStudioStore((s) => s.togglePlay)
   const reset = useStudioStore((s) => s.reset)
-  const setScene = useStudioStore((s) => s.setScene)
-  const setTitleStore = useStudioStore((s) => s.setTitle)
+  const loadDocument = useStudioStore((s) => s.loadDocument)
 
-  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const dirtyRef = useRef(false)
+  const savingRef = useRef(false)
+  const pendingRef = useRef(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastLoadRef = useRef(0)
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -60,48 +72,140 @@ export function StudioPage() {
     enabled: !!user,
   })
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const document: ProjectDocument = {
-        schema_version: 1,
-        renderer_version: 'v1',
-        title,
-        meta: {},
-        scenes: [scene],
-        animation_tracks: [],
-        audio: [],
-        export_settings: {},
+  const { data: assets } = useQuery({
+    queryKey: ['assets'],
+    queryFn: () => apiClient.get<{ items: AssetItem[] }>('/assets?page_size=100'),
+    staleTime: 5 * 60_000,
+  })
+
+  const { data: versions, refetch: refetchVersions } = useQuery({
+    queryKey: ['projects', projectId, 'versions'],
+    queryFn: () => apiClient.get<ProjectVersion[]>(`/projects/${projectId}/versions`),
+    enabled: !!user && !!projectId,
+  })
+
+  const performSave = useCallback(async () => {
+    if (savingRef.current) {
+      pendingRef.current = true
+      return
+    }
+    const s = useStudioStore.getState()
+    if (!useAuthStore.getState().user) return
+    const document = toProjectDocument({ title: s.title, scene: s.scene, tracks: s.tracks, audio: s.audio })
+    savingRef.current = true
+    setSaveState('saving')
+    setSaveError(null)
+    try {
+      if (!s.projectId) {
+        const created = await apiClient.post<ProjectRead>('/projects', {
+          title: s.title,
+          document,
+        })
+        useStudioStore.setState({ projectId: created.id })
+      } else {
+        await apiClient.post<ProjectRead>(`/projects/${s.projectId}/save`, document)
       }
-      if (projectId) {
-        await apiClient.post<ProjectRead>(`/projects/${projectId}/save`, document)
-        return { id: projectId, title }
+      dirtyRef.current = false
+      setSaveState('saved')
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', s.projectId, 'versions'] })
+    } catch (error) {
+      dirtyRef.current = true
+      setSaveState('error')
+      setSaveError(error instanceof Error ? error.message : 'Save failed')
+    } finally {
+      savingRef.current = false
+      if (pendingRef.current) {
+        pendingRef.current = false
+        scheduleSave()
       }
-      const created = await apiClient.post<ProjectRead>('/projects', {
-        title,
-        document,
-      })
-      setProjectId(created.id)
-      await apiClient.post<ProjectRead>(`/projects/${created.id}/save`, document)
-      return created
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const scheduleSave = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      void performSave()
+    }, 2000)
+  }, [performSave])
+
+  // Debounced autosave on content changes
+  useEffect(() => {
+    const unsubscribe = useStudioStore.subscribe((state, prev) => {
+      const contentChanged =
+        state.title !== prev.title ||
+        state.scene !== prev.scene ||
+        state.tracks !== prev.tracks ||
+        state.audio !== prev.audio
+      if (!contentChanged) return
+      if (Date.now() - lastLoadRef.current < 800) return
+      if (!useAuthStore.getState().user) return
+      dirtyRef.current = true
+      scheduleSave()
+    })
+    return unsubscribe
+  }, [scheduleSave])
+
+  // Stop any pending save on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  const saveNow = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    void performSave()
+  }
+
+  const restoreMutation = useMutation({
+    mutationFn: async (version: number) => {
+      if (!projectId) return
+      await apiClient.post<ProjectRead>(`/projects/${projectId}/restore`, { version })
     },
     onSuccess: () => {
-      setSaveMessage('Saved!')
-      void queryClient.invalidateQueries({ queryKey: ['projects'] })
-    },
-    onError: (error) => {
-      setSaveMessage(error instanceof Error ? error.message : 'Save failed')
+      if (projectId) void reloadProject(projectId)
+      void refetchVersions()
     },
   })
 
-  const loadProject = async (project: ProjectRead) => {
-    const detail = await apiClient.get<ProjectDetail>(`/projects/${project.id}`)
-    if (!detail.document?.scenes?.[0]) return
-    setTitleStore(detail.title)
-    setScene(detail.document.scenes[0], detail.id)
+  const reloadProject = async (id: string) => {
+    const detail = await apiClient.get<ProjectDetail>(`/projects/${id}`)
+    if (!detail.document) return
+    const loaded = fromProjectDocument(detail.document)
+    const bgAsset = detail.document.scenes?.[0]?.background_id
+    const bg = bgAsset ? (assets?.items.find((a) => a.id === bgAsset) ?? null) : null
+    lastLoadRef.current = Date.now()
+    loadDocument({
+      title: loaded.title,
+      scene: loaded.scene,
+      tracks: loaded.tracks,
+      audio: loaded.audio,
+      background: bg ? { assetId: bg.id, mediaUrl: bg.media_url } : null,
+      projectId: detail.id,
+    })
   }
 
+  const loadProject = async (project: ProjectRead) => {
+    await reloadProject(project.id)
+  }
+
+  const statusLabel =
+    saveState === 'saving'
+      ? 'Saving…'
+      : saveState === 'saved'
+        ? 'Saved'
+        : saveState === 'error'
+          ? 'Save failed'
+          : null
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <input
           value={title}
@@ -109,12 +213,6 @@ export function StudioPage() {
           className="h-11 flex-1 min-w-52 rounded-lg border border-slate-200 bg-white px-3 text-lg font-semibold text-slate-900 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none"
           placeholder="Name your project"
         />
-        <Button onClick={() => addObject('character')}>
-          <UserRound className="h-4 w-4" /> Character
-        </Button>
-        <Button variant="secondary" onClick={() => addObject('prop')}>
-          <Clapperboard className="h-4 w-4" /> Prop
-        </Button>
         <Button variant="outline" onClick={() => rotateSelected(15)} title="Rotate 15°">
           <FlipHorizontal2 className="h-4 w-4" /> Rotate
         </Button>
@@ -134,8 +232,8 @@ export function StudioPage() {
         <Button variant="outline" onClick={reset}>
           Reset
         </Button>
-        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-          {saveMutation.isPending ? (
+        <Button onClick={saveNow} disabled={saveState === 'saving'}>
+          {saveState === 'saving' ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Save className="h-4 w-4" />
@@ -150,9 +248,54 @@ export function StudioPage() {
           save and submit your projects.
         </p>
       )}
-      {saveMessage && <p className="text-sm text-slate-600">{saveMessage}</p>}
+      <div className="flex items-center gap-3 text-sm text-slate-500">
+        {statusLabel && <span className={saveState === 'error' ? 'text-red-600' : undefined}>{statusLabel}</span>}
+        {saveState === 'error' && saveError && <span className="text-red-600">{saveError}</span>}
+      </div>
 
-      <StudioCanvas />
+      <div className="flex gap-4">
+        <AssetPalette />
+        <div className="min-w-0 flex-1">
+          <StudioCanvas />
+        </div>
+      </div>
+
+      <Timeline />
+
+      {user && projectId && versions && versions.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-brand-600" /> Version history
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {versions.map((version) => (
+              <div key={version.id} className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-slate-50">
+                <span className="text-sm font-medium text-slate-700">
+                  Version {version.version}
+                  {version.version === versions[0].version && (
+                    <span className="ml-2 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">
+                      CURRENT
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs text-slate-400">{version.created_at ?? ''}</span>
+                {version.version !== versions[0].version && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => restoreMutation.mutate(version.version)}
+                    disabled={restoreMutation.isPending}
+                  >
+                    Restore
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {user && projects && projects.items.length > 0 && (
         <Card>

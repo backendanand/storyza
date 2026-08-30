@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ProjectObject(BaseModel):
@@ -13,8 +14,7 @@ class ProjectObject(BaseModel):
     x: float = 0.0
     y: float = 0.0
     rotation: float = 0.0
-    scale_x: float = 1.0
-    scale_y: float = 1.0
+    scale: float = 1.0
     visible: bool = True
     asset_id: str | None = None
     z_index: int = 0
@@ -29,13 +29,29 @@ class SceneObject(BaseModel):
     objects: list[ProjectObject] = Field(default_factory=list)
 
 
+class Keyframe(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    t: float = Field(ge=0)
+    value: float | bool
+    easing: Literal["linear", "easeInOut"] = "linear"
+
+
 class AnimationTrack(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     id: str
     object_id: str
-    property: str
-    keyframes: list[dict] = Field(default_factory=list)
+    property: Literal["x", "y", "rotation", "scale", "visible"]
+    keyframes: list[Keyframe] = Field(default_factory=list)
+
+    @field_validator("keyframes")
+    @classmethod
+    def _keyframes_sorted(cls, keyframes: list[Keyframe]) -> list[Keyframe]:
+        times = [k.t for k in keyframes]
+        if any(second < first for first, second in zip(times, times[1:], strict=False)):
+            raise ValueError("keyframes must be sorted by ascending time")
+        return keyframes
 
 
 class ProjectDocument(BaseModel):
@@ -49,11 +65,17 @@ class ProjectDocument(BaseModel):
     animation_tracks: list[AnimationTrack] = Field(default_factory=list)
     audio: list[dict] = Field(default_factory=list)
     export_settings: dict = Field(default_factory=dict)
+    duration: float = 0.0
 
     @model_validator(mode="after")
     def check_schema_version(self) -> "ProjectDocument":
         if self.schema_version < 1:
             raise ValueError("schema_version must be >= 1")
+        if self.renderer_version != "v1":
+            raise ValueError("unsupported renderer_version")
+        self.duration = max(
+            (k.t for track in self.animation_tracks for k in track.keyframes), default=0.0
+        )
         return self
 
 
@@ -87,3 +109,7 @@ class ProjectRead(BaseModel):
 
 class ProjectDetail(ProjectRead):
     document: ProjectDocument | None = None
+
+
+class ProjectRestore(BaseModel):
+    version: int = Field(ge=1)

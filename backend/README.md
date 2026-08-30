@@ -14,6 +14,7 @@ FastAPI service for Storyza, the school-focused kids creative animation platform
 
 ```bash
 uv sync
+uv run python -m storyza_backend.scripts.seed   # generate SVG assets + seed the library
 uv run alembic upgrade head
 uv run uvicorn storyza_backend.main:app --reload
 ```

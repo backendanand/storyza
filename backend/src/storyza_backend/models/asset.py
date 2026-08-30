@@ -10,6 +10,7 @@ from storyza_backend.models.enums import AssetKind
 class Asset(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "assets"
 
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=True)
     kind: Mapped[str] = mapped_column(
         String(16), nullable=False, default=AssetKind.CHARACTER.value, index=True
     )

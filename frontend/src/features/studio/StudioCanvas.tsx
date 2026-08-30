@@ -1,18 +1,22 @@
 import { useEffect, useRef } from 'react'
-import { Application, Container, Graphics, Ticker } from 'pixi.js'
+import { Application, Assets, Container, Graphics, Sprite, Texture } from 'pixi.js'
 
-import { useStudioStore, selectObject } from './studioStore'
+import { applySampled, sampleScene } from '../../lib/animation'
+import { trackDuration } from './types'
+import { selectObject, useStudioStore } from './studioStore'
+import { playClip } from './audio/sfx'
 
 const WIDTH = 900
 const HEIGHT = 520
 
-function drawObject(kind: string, color: string, size: number): Graphics {
+const textureCache = new Map<string, Texture>()
+
+function fallbackGraphics(kind: string, color: string, size: number): Graphics {
   const g = new Graphics()
   if (kind === 'background') {
     g.rect(0, 0, size, size * 0.6).fill(color)
     return g
   }
-  // character / prop placeholder: rounded body with a "face"
   g.roundRect(0, 0, size, size, size * 0.25).fill(color)
   g.circle(size * 0.32, size * 0.38, size * 0.07).fill(0xffffff)
   g.circle(size * 0.68, size * 0.38, size * 0.07).fill(0xffffff)
@@ -26,14 +30,28 @@ export function StudioCanvas() {
   const mountRef = useRef<HTMLDivElement>(null)
   const appRef = useRef<Application | null>(null)
   const containersRef = useRef<Map<string, Container>>(new Map())
+  const bgContainerRef = useRef<Container | null>(null)
   const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null)
 
   const scene = useStudioStore((s) => s.scene)
+  const tracks = useStudioStore((s) => s.tracks)
+  const audio = useStudioStore((s) => s.audio)
+  const background = useStudioStore((s) => s.background)
   const selectedId = useStudioStore((s) => s.selectedId)
   const isPlaying = useStudioStore((s) => s.isPlaying)
+  const playheadTime = useStudioStore((s) => s.playheadTime)
+  const setPlayhead = useStudioStore((s) => s.setPlayhead)
   const select = useStudioStore((s) => s.select)
   const moveSelected = useStudioStore((s) => s.moveSelected)
+  const endDrag = useStudioStore((s) => s.endDrag)
+  const playedAudioRef = useRef<Set<string>>(new Set())
+  const playheadRef = useRef(0)
 
+  useEffect(() => {
+    playheadRef.current = playheadTime
+  }, [playheadTime])
+
+  // Boot PixiJS once
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -62,10 +80,14 @@ export function StudioCanvas() {
           moveSelected(event.global.x - drag.offsetX, event.global.y - drag.offsetY)
         })
         app.stage.on('pointerup', () => {
+          const hadDrag = dragRef.current !== null
           dragRef.current = null
+          if (hadDrag) endDrag()
         })
         app.stage.on('pointerupoutside', () => {
+          const hadDrag = dragRef.current !== null
           dragRef.current = null
+          if (hadDrag) endDrag()
         })
       })
       .catch((error) => {
@@ -85,7 +107,36 @@ export function StudioCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync objects from the store into PixiJS containers
+  // Background layer
+  useEffect(() => {
+    const stage = appRef.current?.stage
+    if (!stage) return
+    if (bgContainerRef.current) {
+      stage.removeChild(bgContainerRef.current)
+      bgContainerRef.current.destroy({ children: true })
+      bgContainerRef.current = null
+    }
+    if (!background?.mediaUrl) return
+    const container = new Container()
+    container.eventMode = 'none'
+    const sprite = new Sprite(Texture.WHITE)
+    sprite.tint = 0x88aacc
+    void Assets.load(background.mediaUrl)
+      .then((texture) => {
+        sprite.texture = texture
+        sprite.width = WIDTH
+        sprite.height = HEIGHT
+      })
+      .catch(() => {
+        sprite.tint = 0x88aacc
+      })
+    container.addChild(sprite)
+    stage.addChildAt(container, 0)
+    bgContainerRef.current = container
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [background])
+
+  // Sync scene objects into containers
   useEffect(() => {
     const stage = appRef.current?.stage
     if (!stage) return
@@ -96,7 +147,7 @@ export function StudioCanvas() {
       if (!container) {
         const size = 90
         container = new Container()
-        container.addChild(drawObject(object.kind, object.color, size))
+        container.addChild(fallbackGraphics(object.kind, object.color, size))
         container.eventMode = 'static'
         container.cursor = 'grab'
         container.on('pointerdown', (event) => {
@@ -115,7 +166,8 @@ export function StudioCanvas() {
       container.rotation = (object.rotation * Math.PI) / 180
       container.scale.set(object.scale)
       container.visible = object.visible
-      container.alpha = object.id === selectedId ? 1 : 0.85
+      container.alpha = object.id === selectedId ? 1 : 0.9
+      void hydrateSprite(container, object.mediaUrl)
     }
     for (const [id, container] of containersRef.current) {
       if (!seen.has(id)) {
@@ -125,28 +177,47 @@ export function StudioCanvas() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.objects, selectedId])
+  }, [scene.objects, selectedId, isPlaying])
 
-  // Playback: bounce the first object horizontally
+  // Playback: advance playhead and apply sampled transforms
   useEffect(() => {
-    if (!isPlaying) return
-    const firstId = scene.objects[0]?.id
-    if (!firstId) return
-    let t = 0
+    const app = appRef.current
+    if (!app || !isPlaying) return
+    playedAudioRef.current.clear()
     const tick = () => {
-      t += 0.03
-      const object = scene.objects.find((o) => o.id === firstId)
-      const container = containersRef.current.get(firstId)
-      if (object && container) {
-        container.x = object.x + Math.sin(t) * 120
+      const dt = app.ticker.deltaMS / 1000
+      const duration = trackDuration(tracks)
+      const next = playheadRef.current + dt
+      const wrapped = duration > 0 && next >= duration
+      const time = duration > 0 ? (next % duration) : next
+      setPlayhead(time)
+      const sampled = sampleScene(tracks, time)
+      for (const [id, container] of containersRef.current) {
+        const base = scene.objects.find((o) => o.id === id)
+        if (!base) continue
+        const object = applySampled(base, sampled.get(id))
+        container.x = object.x
+        container.y = object.y
+        container.rotation = (object.rotation * Math.PI) / 180
+        container.scale.set(object.scale)
+        container.visible = object.visible
+      }
+      if (wrapped) {
+        playedAudioRef.current.clear()
+      }
+      for (const clip of audio) {
+        if (clip.startTime <= time && !playedAudioRef.current.has(clip.id)) {
+          playedAudioRef.current.add(clip.id)
+          playClip(clip)
+        }
       }
     }
-    Ticker.shared.add(tick)
+    app.ticker.add(tick)
     return () => {
-      Ticker.shared.remove(tick)
+      app.ticker.remove(tick)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, scene.objects])
+  }, [isPlaying, tracks, scene.objects, audio])
 
   const selected = selectObject(scene, selectedId)
 
@@ -157,9 +228,36 @@ export function StudioCanvas() {
         <p className="text-xs text-slate-500">
           Selected: <span className="font-semibold text-slate-700">{selected.name}</span> · x{' '}
           {selected.x.toFixed(0)} · y {selected.y.toFixed(0)} · {selected.rotation}° · scale{' '}
-          {selected.scale.toFixed(2)}
+          {selected.scale.toFixed(2)} · playhead {playheadTime.toFixed(1)}s
         </p>
       )}
     </div>
   )
+}
+
+async function hydrateSprite(container: Container, mediaUrl: string | null) {
+  const existing = container.children.find((c) => c instanceof Sprite)
+  if (mediaUrl) {
+    const cached = textureCache.get(mediaUrl)
+    const texture = cached ?? (await Assets.load(mediaUrl).catch(() => null))
+    if (!texture) return
+    if (!textureCache.has(mediaUrl)) textureCache.set(mediaUrl, texture)
+    if (existing instanceof Sprite) {
+      existing.texture = texture
+    } else {
+      const sprite = new Sprite(texture)
+      sprite.width = 90
+      sprite.height = 90
+      container.addChildAt(sprite, 0)
+      container.children.forEach((child) => {
+        if (child instanceof Graphics) child.visible = false
+      })
+    }
+  } else if (existing instanceof Sprite) {
+    container.removeChild(existing)
+    existing.destroy()
+    container.children.forEach((child) => {
+      if (child instanceof Graphics) child.visible = true
+    })
+  }
 }

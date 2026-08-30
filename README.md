@@ -36,9 +36,13 @@ storyza/
 ```bash
 cd backend
 uv sync
+uv run python -m storyza_backend.scripts.seed   # generates SVG assets + seeds the library
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
+
+Note: the backend package lives at `src/storyza_backend`, so run uvicorn as
+`uv run uvicorn storyza_backend.main:app --reload`.
 
 ### Frontend
 

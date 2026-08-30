@@ -16,6 +16,8 @@ from storyza_backend.schemas.project import (
     ProjectDetail,
     ProjectDocument,
     ProjectRead,
+    ProjectRestore,
+    ProjectVersionRead,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -154,6 +156,67 @@ async def update_project(
 ) -> Project:
     project = await _get_owned_project(db, user.id, project_id)
     project.title = title
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@router.get("/{project_id}/versions", response_model=list[ProjectVersionRead])
+async def list_project_versions(
+    project_id: str,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[ProjectVersion]:
+    await _get_owned_project(db, user.id, project_id)
+    result = await db.execute(
+        select(ProjectVersion)
+        .where(ProjectVersion.project_id == project_id)
+        .order_by(ProjectVersion.version.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.post("/{project_id}/restore", response_model=ProjectRead)
+async def restore_project_version(
+    project_id: str,
+    payload: ProjectRestore,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Project:
+    project = await _get_owned_project(db, user.id, project_id)
+    if project.status == ProjectStatus.LOCKED.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Project is locked")
+
+    version_result = await db.execute(
+        select(ProjectVersion).where(
+            ProjectVersion.project_id == project.id,
+            ProjectVersion.version == payload.version,
+        )
+    )
+    source = version_result.scalar_one_or_none()
+    if source is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
+
+    max_version = (
+        await db.execute(
+            select(func.max(ProjectVersion.version)).where(
+                ProjectVersion.project_id == project.id
+            )
+        )
+    ).scalar()
+    next_version = (max_version or 0) + 1
+    restored = ProjectVersion(
+        project_id=project.id,
+        version=next_version,
+        document=source.document,
+        renderer_version=source.renderer_version,
+        checksum=source.checksum,
+    )
+    db.add(restored)
+    await db.flush()
+    project.current_version_id = restored.id
+    project.schema_version = source.document.get("schema_version", project.schema_version)
+    project.scene_count = len(source.document.get("scenes", []))
     await db.commit()
     await db.refresh(project)
     return project
