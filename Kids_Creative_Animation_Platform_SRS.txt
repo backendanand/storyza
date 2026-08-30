@@ -1,0 +1,236 @@
+Software Requirements Specification (SRS)
+Version 1.0 | Date: 30 August 2026
+1. Purpose
+This SRS defines functional, non-functional, data, interface, security and operational requirements for Version 1 of the Kids Creative Animation & School Learning Platform. It translates the approved first-year SOW into implementation-oriented requirements.
+2. Product Scope
+The system shall provide a multi-tenant school platform in which students create 2D animations and stories, teachers assign and assess creative activities, schools manage users and classes, and platform administrators manage curriculum/content and operational configuration.
+3. Actors & Roles
+4. Functional Requirements
+FR-AUTH — Authentication & Authorization
+FR-AUTH-001: The system shall authenticate users using secure credentials.
+FR-AUTH-002: The system shall issue short-lived access tokens and refresh tokens.
+FR-AUTH-003: The system shall enforce role-based authorization on every protected API.
+FR-AUTH-004: The system shall enforce tenant/school data isolation.
+FR-AUTH-005: The system shall support account activation/deactivation.
+FR-AUTH-006: The system shall support password reset/recovery.
+FR-AUTH-007: Important security and administrative events shall be audit logged.
+FR-SCHOOL — School & Classroom Management
+FR-SCHOOL-001: School Admin shall create/manage classes.
+FR-SCHOOL-002: School Admin shall add/import teachers and students subject to supported onboarding flow.
+FR-SCHOOL-003: Teacher shall access only assigned classes/students.
+FR-SCHOOL-004: The system shall maintain class membership history sufficient for reporting.
+FR-SCHOOL-005: School Admin shall view school-level activity/submission statistics.
+FR-CURRICULUM — Curriculum & Activities
+FR-CURRICULUM-001: Platform Admin shall define grades, subjects, topics and activity categories.
+FR-CURRICULUM-002: Activities shall support title, description, instructions, grade, subject, difficulty, duration and learning objective.
+FR-CURRICULUM-003: Activities shall support required/allowed asset sets.
+FR-CURRICULUM-004: Activities shall support assessment rubrics.
+FR-CURRICULUM-005: Activities shall have draft/published/archived lifecycle states.
+FR-CURRICULUM-006: Teachers shall be able to select published activities for assignment.
+FR-ASSIGNMENT — Assignment Workflow
+FR-ASSIGNMENT-001: Teacher shall assign an activity to one or more classes.
+FR-ASSIGNMENT-002: Teacher shall configure instructions and due date.
+FR-ASSIGNMENT-003: Students shall see active assigned activities.
+FR-ASSIGNMENT-004: Student shall open an assignment directly into the relevant project workflow.
+FR-ASSIGNMENT-005: Student shall submit a project.
+FR-ASSIGNMENT-006: System shall record submission status and timestamps.
+FR-ASSIGNMENT-007: Teacher shall review and return feedback.
+FR-PROJECT — Project Management
+FR-PROJECT-001: Student shall create a project from blank or template.
+FR-PROJECT-002: Project shall have a unique identifier, owner, title, status, version and timestamps.
+FR-PROJECT-003: Project content shall be stored as a versioned JSON document.
+FR-PROJECT-004: System shall autosave project changes.
+FR-PROJECT-005: Student shall manually save and rename projects.
+FR-PROJECT-006: System shall provide basic project recovery/version history.
+FR-PROJECT-007: Project ownership and access shall be enforced.
+FR-STUDIO — Creative Editor
+FR-STUDIO-001: Student shall add characters, backgrounds and props to a scene.
+FR-STUDIO-002: Student shall drag, move, rotate and scale objects.
+FR-STUDIO-003: Student shall reorder objects/layers where required by the editor.
+FR-STUDIO-004: Student shall create basic animation actions such as movement, rotation, scaling and visibility changes.
+FR-STUDIO-005: System shall provide a simple timeline/playhead representation.
+FR-STUDIO-006: Student shall preview the animation in the browser.
+FR-STUDIO-007: Student shall undo and redo supported edits.
+FR-STUDIO-008: Student shall add text/dialogue.
+FR-STUDIO-009: Student shall add approved audio/music and record voice where browser/device permissions allow.
+FR-STUDIO-010: Studio shall work with mouse/touch interactions on supported tablet and desktop browsers.
+FR-STORY — Story Builder
+FR-STORY-001: Student shall create a story using guided structure.
+FR-STORY-002: Student shall create/reorder scenes.
+FR-STORY-003: Student shall assign characters and dialogue to scenes.
+FR-STORY-004: Student shall convert story scenes into animation scenes.
+FR-STORY-005: AI assistance shall be optional and controlled by school/platform policy.
+FR-ASSET — Asset Management
+FR-ASSET-001: System shall store asset metadata separately from binary media.
+FR-ASSET-002: Assets shall be categorized and searchable.
+FR-ASSET-003: Assets shall support age/safety classification.
+FR-ASSET-004: Only authorized users/admins shall upload or publish assets according to permissions.
+FR-ASSET-005: Project references shall use stable asset identifiers/version references.
+FR-SUBMISSION — Review & Assessment
+FR-SUBMISSION-001: Student shall submit the current eligible project version.
+FR-SUBMISSION-002: Teacher shall preview submitted projects.
+FR-SUBMISSION-003: Teacher shall score rubric criteria.
+FR-SUBMISSION-004: Teacher shall provide textual feedback.
+FR-SUBMISSION-005: Student shall see released feedback/results.
+FR-SUBMISSION-006: Submission status shall support at least Draft, Submitted, Under Review, Reviewed/Returned.
+FR-GAMIFICATION — Challenges & Showcase
+FR-GAME-001: System shall award configured badges based on defined achievement rules.
+FR-GAME-002: System shall support creative challenges.
+FR-GAME-003: Teacher shall approve work before school showcase publication.
+FR-GAME-004: Showcase shall not expose sensitive student information.
+FR-AI — AI Assistance
+FR-AI-001: AI access shall occur through backend-controlled services, not direct client-side provider credentials.
+FR-AI-002: System shall support an AI provider abstraction.
+FR-AI-003: Story Assistant shall generate age-appropriate prompts/suggestions.
+FR-AI-004: AI features shall support configurable usage limits.
+FR-AI-005: AI requests/responses needed for safety, billing or troubleshooting shall be logged according to privacy policy.
+FR-AI-006: AI shall not be required for basic project creation.
+FR-AI-007: School/admin policy shall be able to disable or restrict AI features.
+FR-MEDIA — Rendering & Export
+FR-MEDIA-001: Student shall request MP4/GIF export.
+FR-MEDIA-002: Export shall execute asynchronously.
+FR-MEDIA-003: System shall provide export job status.
+FR-MEDIA-004: Successful exports shall be stored in object storage.
+FR-MEDIA-005: Failed jobs shall provide a recoverable error state and retry policy.
+FR-MEDIA-006: Export workers shall not block normal API request processing.
+5. Project Document Model Requirements
+PRJ-001: Project JSON shall be versioned.
+PRJ-002: Project JSON shall define project metadata, scenes, assets, objects, animation tracks, audio and export settings.
+PRJ-003: Renderer versions shall be tracked to support future compatibility.
+PRJ-004: Invalid project documents shall be rejected before persistence or rendering.
+PRJ-005: Schema migrations shall be version-aware.
+6. Data Model — Core Entities
+7. API Requirements
+API-001: APIs shall be RESTful and versioned under /api/v1.
+API-002: API contracts shall be documented through OpenAPI.
+API-003: APIs shall use consistent error response structures.
+API-004: Protected APIs shall enforce authentication, authorization and tenant context.
+API-005: List endpoints shall support pagination and appropriate filtering.
+API-006: APIs handling large media shall use object-storage upload/download mechanisms rather than unnecessarily proxying binaries through the application server.
+API-007: Idempotency shall be used for operations where duplicate requests could create duplicate jobs/submissions.
+8. Non-Functional Requirements
+8.1 Performance
+NFR-PERF-001: Normal CRUD API responses should target p95 under 500 ms under agreed pilot load, excluding long-running jobs.
+NFR-PERF-002: Studio interactions should feel responsive on supported school tablets/desktops.
+NFR-PERF-003: Autosave shall be debounced/throttled to avoid excessive API traffic.
+NFR-PERF-004: Rendering and AI workloads shall execute asynchronously.
+8.2 Availability & Reliability
+NFR-REL-001: Production deployment shall include health checks.
+NFR-REL-002: Background jobs shall support retry and failure tracking.
+NFR-REL-003: Database backups shall be configured according to the production environment.
+NFR-REL-004: Critical project data shall not depend solely on browser local storage.
+8.3 Security & Privacy
+NFR-SEC-001: All production traffic shall use HTTPS.
+NFR-SEC-002: Passwords shall be securely hashed using a modern password hashing algorithm.
+NFR-SEC-003: Secrets shall not be stored in source code.
+NFR-SEC-004: Tenant isolation shall be enforced server-side.
+NFR-SEC-005: Input validation shall be applied to all external inputs.
+NFR-SEC-006: Uploads shall be type/size validated and scanned/controlled as appropriate.
+NFR-SEC-007: Child-related data shall be minimized and access-controlled.
+NFR-SEC-008: AI outputs and user-generated content shall pass applicable safety/moderation controls.
+NFR-SEC-009: Privacy, consent and retention policies shall be configurable/implemented according to the target market and applicable law.
+8.4 Accessibility & Usability
+NFR-UX-001: UI shall be designed for children with large touch targets and low cognitive load.
+NFR-UX-002: Critical workflows shall minimize text complexity for younger learners.
+NFR-UX-003: Teacher/admin interfaces shall support keyboard and standard accessibility practices.
+NFR-UX-004: Color shall not be the sole indicator of status.
+8.5 Compatibility
+NFR-COMP-001: Support current major Chromium-based browsers used by schools.
+NFR-COMP-002: Support current Firefox/Safari where practical for the defined pilot device matrix.
+NFR-COMP-003: Support desktop and tablet layouts.
+NFR-COMP-004: Browser/device capability detection shall be used for camera/microphone-dependent features.
+9. System Architecture Requirements
+ARCH-001: Backend shall use Python/FastAPI modular monolith architecture.
+ARCH-002: Frontend shall use React/TypeScript.
+ARCH-003: PixiJS shall handle the primary 2D rendering canvas.
+ARCH-004: PostgreSQL shall be the system of record for transactional data.
+ARCH-005: Project documents shall use PostgreSQL JSONB with versioning.
+ARCH-006: Redis shall provide cache/task-broker capabilities.
+ARCH-007: Celery shall execute background jobs.
+ARCH-008: S3-compatible storage shall hold binary media.
+ARCH-009: FFmpeg shall be used for media export processing.
+ARCH-010: AI provider credentials shall remain server-side.
+ARCH-011: The architecture shall allow future extraction of rendering/AI services without rewriting the core domain model.
+10. Observability & Operations
+OPS-001: Application logs shall be structured.
+OPS-002: API, worker and database health shall be monitorable.
+OPS-003: Errors shall have correlation/request identifiers.
+OPS-004: Background jobs shall expose success/failure/retry metrics.
+OPS-005: Audit logs shall be retained according to security/privacy policy.
+11. Testing Requirements
+TEST-001: Unit tests for core business logic.
+TEST-002: API integration tests.
+TEST-003: Frontend component and state tests.
+TEST-004: End-to-end tests for student and teacher critical workflows.
+TEST-005: Project JSON schema/compatibility tests.
+TEST-006: Rendering/export pipeline tests.
+TEST-007: Authorization and tenant-isolation tests.
+TEST-008: Basic performance/load testing before commercial launch.
+12. Acceptance Criteria
+A new student can enter an assigned activity, create a project, preview it, save it and submit it.
+A teacher can create/assign an activity, see submissions, open a project, assess it and return feedback.
+A school admin can manage classes/users and view basic reports.
+A project can be reopened without losing its core structure.
+A valid project can be exported asynchronously to MP4 and/or GIF.
+Unauthorized users cannot access another school's data.
+AI can be disabled/restricted by policy and is not required for core creation.
+Critical workflows pass automated tests and pilot UAT.
+13. Recommended V1 Status Model
+14. Release Strategy
+Internal Alpha: core studio and project persistence.
+Closed Pilot: teacher workflow + first curriculum activities.
+Expanded Pilot: school administration + assessment + showcase.
+Beta: AI V1 + export hardening + security/accessibility.
+Commercial V1: production release, onboarding and licensing.
+15. Key Risks & Mitigations
+16. Definition of Done — V1
+All critical functional requirements implemented.
+Critical security and tenant-isolation tests passing.
+Student, teacher and school workflows validated through UAT.
+Core curriculum/activity library populated.
+Export pipeline stable.
+AI V1 is controllable and non-blocking.
+Production deployment and rollback procedures documented.
+Monitoring, backups and incident procedures configured.
+User/admin documentation delivered.
+Role | Permissions Summary
+Platform Admin | Global platform configuration, schools, content, assets, moderation, operational reports.
+School Admin | School users, classes, settings and school reports.
+Teacher | Assigned classes, activities, assignments, submissions, assessments.
+Student | Own projects, assigned activities, submissions, approved showcase.
+Parent (controlled/future) | Only explicitly approved child progress/showcase information.
+Entity | Purpose
+Tenant/School | Organizational boundary.
+User | Identity and account.
+Role | Authorization.
+Classroom | School class/group.
+Class Membership | Student/teacher association.
+Grade/Subject/Topic | Curriculum taxonomy.
+Activity | Reusable learning/creative task.
+Assignment | Activity assigned to class/student.
+Project | Student creative work and project document.
+Project Version | Recoverable project snapshots.
+Asset | Character/background/prop/audio metadata.
+Submission | Submitted project reference and status.
+Rubric/Rubric Criterion | Assessment model.
+Assessment | Teacher evaluation.
+Badge/Achievement | Gamification.
+Challenge | Creative challenge.
+AI Interaction | Controlled AI usage/audit metadata.
+Export Job | Asynchronous render/export request.
+Audit Log | Security/admin activity history.
+Domain | Suggested Statuses
+Project | DRAFT, SUBMITTED, LOCKED/ARCHIVED
+Assignment | DRAFT, PUBLISHED, CLOSED, ARCHIVED
+Submission | DRAFT, SUBMITTED, UNDER_REVIEW, REVIEWED, RETURNED
+Activity | DRAFT, PUBLISHED, ARCHIVED
+Export Job | QUEUED, PROCESSING, COMPLETED, FAILED, CANCELLED
+User | INVITED, ACTIVE, SUSPENDED, DEACTIVATED
+Risk | Mitigation
+Editor becomes too complex | Use child-first UX; hide professional concepts behind guided controls.
+AI completes student work | AI-as-assistant policy, hints, limits and teacher controls.
+Browser performance issues | PixiJS, asset optimization, scene limits and performance testing.
+Video rendering costs | Async workers, quotas, resolution/duration limits and queue controls.
+School adoption is low | Pilot early; build teacher workflow and curriculum value before adding advanced tech.
+Child safety/privacy | Restricted communication, moderation, least-privilege access and policy/legal review.
+Technology changes quickly | Provider abstraction, versioned project schema and modular architecture.

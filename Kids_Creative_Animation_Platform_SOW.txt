@@ -1,0 +1,190 @@
+Scope of Work (SOW)
+Version 1.0 | Date: 30 August 2026
+1. Executive Summary
+This Scope of Work defines the first-year delivery scope for a school-focused Creative Learning Platform that enables children to create animations, stories and digital projects through a simple, guided interface. The platform is designed for classroom use, with teachers assigning activities and reviewing student work.
+The Year-1 objective is not to build a professional animation suite. It is to launch a commercially usable, child-friendly 2D creative platform within 12 months, validate adoption with schools, and establish a foundation for AI-assisted creation, 3D, games and XR over subsequent years.
+2. Product Vision
+Enable children to turn ideas into digital experiences—starting with animation—while helping schools integrate creativity, storytelling and digital creation into everyday learning.
+3. Year-1 Business Objective
+Deliver a production-ready web/tablet platform within 12 months.
+Support classroom workflows: school → class → activity → assignment → student creation → submission → teacher review.
+Validate the product with real school pilots during development rather than waiting for final launch.
+Establish a subscription/license-ready B2B/B2B2C product model.
+Build the platform so AI can be introduced without redesigning the core product.
+4. Target Users
+5. Scope of Work
+5.1 Student Creative Studio
+Simple child-friendly dashboard.
+Project creation and project naming.
+2D scene/canvas editor.
+Character, background and prop libraries.
+Drag-and-drop placement.
+Move, rotate and scale objects.
+Basic object animation and keyframe/timeline concepts hidden behind a simple UX.
+Scene management.
+Text/dialogue elements.
+Voice recording and audio attachment.
+Sound effects and background music from approved library.
+Play/preview controls.
+Undo/redo.
+Autosave and manual save.
+Project versioning/basic recovery.
+Export to MP4 and GIF.
+Assignment submission workflow.
+5.2 Story Builder
+Story template selection.
+Beginning/middle/end structure.
+Scene sequencing.
+Character/dialogue setup.
+Simple prompts and guided storytelling.
+Ability to convert a story into an animation project.
+5.3 Curriculum & Activity System
+Subject, class/grade and topic taxonomy.
+Reusable activity templates.
+Activity instructions and expected outcome.
+Difficulty level.
+Estimated duration.
+Required/allowed assets.
+Rubric/assessment criteria.
+Activity assignment to one or more classes.
+Initial content should demonstrate cross-subject use cases such as Science (Water Cycle, Solar System, Food Chain), Mathematics (Fractions, Geometry), Languages (Storytelling, dialogue), EVS/Environment and Social Science.
+5.4 Teacher Portal
+Teacher dashboard.
+Class and student management within school scope.
+Activity discovery/selection.
+Assignment creation.
+Due date and instructions.
+Submission list.
+Project preview.
+Rubric-based assessment.
+Text feedback.
+Basic progress and participation reports.
+5.5 School Administration
+School profile and settings.
+Teacher/student management.
+Class management.
+Basic usage dashboard.
+Activity and submission statistics.
+Role and access management.
+5.6 Asset Library
+Characters, backgrounds, props, audio and templates.
+Asset categories and tags.
+Search/filter.
+Age-appropriate and moderated content.
+School/platform asset ownership distinction.
+Asset metadata and versioning.
+5.7 Gamification & Showcase
+Badges for milestones and skills.
+Creative challenges.
+Class/school showcase with teacher approval.
+Certificates or achievement records.
+Progress indicators focused on learning and improvement rather than only ranking.
+5.8 AI Foundation and V1 AI Features
+Provider-agnostic AI service abstraction.
+AI Story Assistant.
+Creative prompts and scene suggestions.
+Dialogue assistance.
+Animation hints/feedback.
+Basic AI moderation/safety layer.
+AI usage limits and audit logging.
+AI should assist the learner rather than automatically complete graded work. Teacher/school controls must be able to restrict AI features.
+5.9 Authentication, Authorization & Safety
+Role-based access control: Platform Admin, School Admin, Teacher, Student; Parent as controlled/future capability.
+School/tenant isolation.
+Secure authentication with access and refresh tokens.
+Password reset and account lifecycle.
+Audit logging for important administrative actions.
+Child-safety controls, content moderation and restricted discovery.
+No unrestricted public chat or open student-to-stranger communication.
+6. Technical Scope
+7. High-Level Architecture
+The platform will use a web-first architecture. React handles the product UI while PixiJS handles the interactive 2D creative canvas. FastAPI provides business APIs. PostgreSQL stores transactional data and JSONB project documents. Object storage stores media/assets. Celery workers process exports, media and AI jobs asynchronously. Redis provides caching and task-broker capabilities.
+Animation projects will use a versioned JSON document model so that the same project can later be consumed by advanced renderers, AI services, 3D workflows or XR experiences.
+8. 12-Month Delivery Plan
+9. Key Deliverables
+Production-ready web application.
+Student Creative Studio.
+Teacher Portal.
+School Administration Portal.
+Platform Administration capabilities.
+Curriculum/activity engine.
+Asset library.
+Assignment/submission/assessment workflow.
+2D project JSON format and renderer.
+MP4/GIF export pipeline.
+V1 AI assistant layer.
+Authentication/RBAC/multi-tenancy.
+Documentation: architecture, API, deployment, user/admin guides.
+Automated test suite and CI/CD pipeline.
+10. Out of Scope for Year 1
+Professional-grade 3D animation suite.
+Full game engine.
+Advanced VR/AR authoring.
+Professional motion-capture pipeline.
+Unrestricted generative video creation.
+Open public social network.
+Marketplace for third-party assets.
+Native Android/iOS applications as the primary delivery channel.
+Complex enterprise SIS/LMS integrations unless separately scoped.
+Full parent app experience.
+11. Success Criteria
+A target Class 3–6 student can create a simple 15–30 second animation with minimal adult assistance.
+A teacher can create/assign an activity and review a submission without technical support.
+A school can onboard users/classes and operate classroom workflows.
+Projects autosave reliably and can be recovered.
+Exports complete asynchronously without blocking API requests.
+Tenant and role boundaries are enforced.
+Pilot schools demonstrate repeated use rather than one-time experimentation.
+The platform is ready for paid licensing after pilot validation.
+12. Assumptions & Dependencies
+Initial target is web/tablet rather than native mobile.
+Year-1 curriculum content will be curated and age-appropriate.
+AI provider costs and policies may change; provider abstraction is required.
+School onboarding and pilot feedback are essential project dependencies.
+Content moderation and child-safety requirements must be validated for target markets before commercial rollout.
+13. Future Roadmap (Post Year 1)
+AI-generated/assisted characters and scenes.
+Sketch-to-character and image-to-asset workflows.
+Advanced 2D animation.
+3D creation and animation.
+Mini-game creation.
+AR/XR experiences.
+Advanced analytics and learning insights.
+School competitions and creator portfolios.
+Integrations with LMS/SIS ecosystems.
+User | Primary Needs
+Student | Create animations/stories easily; learn through guided activities; save, submit and showcase work.
+Teacher | Create/assign activities; provide instructions; review, assess and give feedback.
+School Admin | Manage school users/classes; monitor adoption; view reports and school-level activity.
+Platform Admin | Manage schools, curriculum/content, assets, subscriptions and system configuration.
+Parent (future/limited V1) | View approved student work and progress where the school enables it.
+Layer | Technology
+Frontend | React + TypeScript + Vite
+UI | Tailwind CSS + shadcn/ui
+State | Zustand + TanStack Query
+2D Rendering | PixiJS
+Backend | Python + FastAPI + Pydantic
+Data Access | SQLAlchemy 2.x + asyncpg; raw SQL where appropriate
+Database | PostgreSQL
+Cache/Queue | Redis
+Background Jobs | Celery
+Object Storage | S3-compatible object storage
+Media | FFmpeg
+API | REST + OpenAPI
+Auth | JWT + Refresh Tokens + RBAC
+Testing | Pytest + frontend unit/integration/e2e tests
+Deployment | Docker + Linux + CI/CD
+Architecture | Modular Monolith with separate worker processes
+Period | Milestone | Primary Deliverables
+Month 1 | Discovery & UX | Product architecture, personas, workflows, UX prototypes, data model, project format.
+Month 2 | Studio Foundation | React shell, PixiJS canvas, assets, scene model, basic interactions.
+Month 3 | Animation MVP | Basic animation, timeline abstraction, audio, save/autosave, preview.
+Month 4 | Teacher Pilot | Teacher portal, classes, activities, assignments, first school pilot.
+Month 5 | Curriculum | Activity engine, subject mapping, rubrics, starter content.
+Month 6 | Submission & Assessment | Submission workflow, review, scoring, feedback, reports.
+Month 7 | School Productization | School admin, onboarding, permissions, usage analytics.
+Month 8 | Gamification | Badges, challenges, showcase, certificates/progress.
+Month 9 | AI V1 | Story assistant, creative assistance, moderation, usage controls.
+Month 10 | Media & Scale | Export hardening, queue workers, storage/CDN optimization, performance.
+Month 11 | Beta | Security, accessibility, usability, pilot expansion, bug stabilization.
+Month 12 | Commercial Launch | Production release, onboarding, documentation, pricing/licensing readiness.
