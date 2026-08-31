@@ -6,6 +6,7 @@ import {
   Expand,
   Eye,
   Mic,
+  Minus,
   Plus,
   Play,
   RotateCw,
@@ -18,7 +19,7 @@ import {
 import { cn } from '../../lib/utils'
 import { playClip, recordVoice, type SfxPreset } from './audio/sfx'
 import { selectObject, useStudioStore, tracksForObject } from './studioStore'
-import { trackDuration, type AudioClip, type TrackProperty } from './types'
+import { contentDuration, type AudioClip, type TrackProperty } from './types'
 
 const PX_PER_SEC = 80
 const ROW_HEIGHT = 24
@@ -44,6 +45,8 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
   const playheadTime = useStudioStore((s) => s.playheadTime)
   const isPlaying = useStudioStore((s) => s.isPlaying)
   const recording = useStudioStore((s) => s.recording)
+  const durationSetting = useStudioStore((s) => s.duration)
+  const setDuration = useStudioStore((s) => s.setDuration)
   const setPlayhead = useStudioStore((s) => s.setPlayhead)
   const setRecording = useStudioStore((s) => s.setRecording)
   const addKeyframeAtPlayhead = useStudioStore((s) => s.addKeyframeAtPlayhead)
@@ -56,8 +59,7 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
   const selected = selectObject(scene, selectedId)
   const selectedTracks = selected ? tracksForObject(tracks, selected.id) : []
 
-  const audioEnd = audio.reduce((max, c) => Math.max(max, c.startTime + c.duration), 0)
-  const duration = Math.max(trackDuration(tracks), audioEnd, 5)
+  const duration = Math.max(durationSetting, contentDuration(tracks, audio), 1)
   const timelineWidth = duration * PX_PER_SEC
 
   const timeFromEvent = (clientX: number): number => {
@@ -139,10 +141,7 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
   const seconds = Array.from({ length: Math.ceil(duration) }, (_, i) => i + 1)
 
   return (
-    <div
-      className="rounded-3xl border-2 border-white bg-white p-2.5 shadow-soft"
-      style={{ width: 'var(--canvas-w, 100%)' }}
-    >
+    <div className="w-full rounded-3xl border-2 border-white bg-white p-2.5 shadow-soft">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <button
           onClick={() => setRecording(!recording)}
@@ -160,6 +159,27 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <div className="flex h-9 items-center gap-0.5 rounded-full bg-slate-100 px-1.5">
+            <button
+              onClick={() => setDuration(duration - 1)}
+              disabled={duration <= 1}
+              aria-label="Decrease timeline length"
+              title="Shorter timeline"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-white disabled:opacity-40"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="px-1 text-xs font-bold text-slate-600 tabular-nums">{duration}s</span>
+            <button
+              onClick={() => setDuration(duration + 1)}
+              disabled={duration >= 120}
+              aria-label="Increase timeline length"
+              title="Longer timeline"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-white disabled:opacity-40"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
           <button
             onClick={addSfx}
             className="flex h-9 items-center gap-1.5 rounded-full bg-slate-100 px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"

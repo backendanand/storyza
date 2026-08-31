@@ -59,6 +59,7 @@ interface StudioState {
   tracks: AnimationTrack[]
   audio: AudioClip[]
   background: SceneBackground | null
+  duration: number
   selectedId: string | null
   selectedKeyframe: SelectedKeyframe | null
   isPlaying: boolean
@@ -66,9 +67,16 @@ interface StudioState {
   recording: boolean
   saveState: SaveState
   saveError: string | null
+  projectsModalOpen: boolean
+  versionsModalOpen: boolean
+  hasVersions: boolean
 
   setTitle: (title: string) => void
   setProjectId: (projectId: string | null) => void
+  setDuration: (duration: number) => void
+  setProjectsModalOpen: (open: boolean) => void
+  setVersionsModalOpen: (open: boolean) => void
+  setHasVersions: (hasVersions: boolean) => void
   setSaveState: (state: SaveState) => void
   setSaveError: (error: string | null) => void
   setScene: (scene: StudioScene, projectId?: string | null) => void
@@ -78,6 +86,7 @@ interface StudioState {
     tracks: AnimationTrack[]
     audio: AudioClip[]
     background: SceneBackground | null
+    duration?: number
     projectId?: string | null
   }) => void
   addObject: (
@@ -90,7 +99,9 @@ interface StudioState {
   rotateSelected: (degrees: number) => void
   scaleSelected: (factor: number) => void
   moveSelected: (x: number, y: number) => void
+  transformSelected: (transform: { x?: number; y?: number; rotation?: number; scale?: number }) => void
   endDrag: () => void
+  endTransform: (mode: 'resize' | 'rotate') => void
   _recordProperty: (objectId: string, property: TrackProperty) => void
 
   togglePlay: () => void
@@ -124,6 +135,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   tracks: [],
   audio: [],
   background: null,
+  duration: 5,
   selectedId: null,
   selectedKeyframe: null,
   isPlaying: false,
@@ -131,10 +143,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   recording: false,
   saveState: 'idle',
   saveError: null,
+  projectsModalOpen: false,
+  versionsModalOpen: false,
+  hasVersions: false,
 
   setTitle: (title) => set({ title }),
 
   setProjectId: (projectId) => set({ projectId }),
+
+  setDuration: (duration) => set({ duration: Math.min(120, Math.max(1, Math.round(duration))) }),
+
+  setProjectsModalOpen: (open) => set({ projectsModalOpen: open }),
+  setVersionsModalOpen: (open) => set({ versionsModalOpen: open }),
+  setHasVersions: (hasVersions) => set({ hasVersions }),
 
   setSaveState: (saveState) => set({ saveState }),
   setSaveError: (saveError) => set({ saveError }),
@@ -148,13 +169,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       playheadTime: 0,
     }),
 
-  loadDocument: ({ title, scene, tracks, audio, background, projectId = null }) =>
+  loadDocument: ({ title, scene, tracks, audio, background, duration, projectId = null }) =>
     set({
       title,
       scene,
       tracks,
       audio,
       background,
+      duration: duration ?? 5,
       projectId,
       selectedId: scene.objects[0]?.id ?? null,
       selectedKeyframe: null,
@@ -266,6 +288,39 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     })
   },
 
+  transformSelected: ({ x, y, rotation, scale }) => {
+    const { scene, selectedId } = get()
+    if (!selectedId) return
+    set({
+      scene: {
+        ...scene,
+        objects: scene.objects.map((o) =>
+          o.id === selectedId
+            ? {
+                ...o,
+                x: x ?? o.x,
+                y: y ?? o.y,
+                rotation: rotation ?? o.rotation,
+                scale: scale !== undefined ? Math.min(3, Math.max(0.2, scale)) : o.scale,
+              }
+            : o,
+        ),
+      },
+    })
+  },
+
+  endTransform: (mode) => {
+    const { recording, selectedId } = get()
+    if (!recording || !selectedId) return
+    if (mode === 'resize') {
+      get()._recordProperty(selectedId, 'x')
+      get()._recordProperty(selectedId, 'y')
+      get()._recordProperty(selectedId, 'scale')
+    } else {
+      get()._recordProperty(selectedId, 'rotation')
+    }
+  },
+
   endDrag: () => {
     const { recording, selectedId } = get()
     if (!recording || !selectedId) return
@@ -354,6 +409,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       tracks: [],
       audio: [],
       background: null,
+      duration: 5,
       selectedId: null,
       selectedKeyframe: null,
       isPlaying: false,
@@ -361,6 +417,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       recording: false,
       saveState: 'idle',
       saveError: null,
+      projectsModalOpen: false,
+      versionsModalOpen: false,
+      hasVersions: false,
     }),
 }))
 

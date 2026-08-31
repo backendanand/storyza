@@ -1,15 +1,45 @@
 import { useEffect, useRef } from 'react'
-import { Application, Assets, Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js'
 
 import { applySampled, sampleScene } from '../../lib/animation'
-import { trackDuration } from './types'
+import { contentDuration, type StudioObject } from './types'
 import { selectObject, useStudioStore } from './studioStore'
 import { playClip } from './audio/sfx'
 
 const WIDTH = 900
-const HEIGHT = 520
+const HEIGHT = 560
+const BOX = 90
+const HANDLE_COLOR = 0x2f6bff
 
 const textureCache = new Map<string, Texture>()
+
+async function loadSvgTexture(url: string): Promise<Texture | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const svg = await response.text()
+    const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+    try {
+      const image = new Image()
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve()
+        image.onerror = () => reject(new Error(`svg decode failed: ${url}`))
+        image.src = objectUrl
+      })
+      let resource: ImageBitmap | HTMLImageElement = image
+      try {
+        resource = await createImageBitmap(image)
+      } catch {
+        resource = image
+      }
+      return new Texture(new ImageSource({ resource }))
+    } finally {
+      URL.revokeObjectURL(objectUrl)
+    }
+  } catch {
+    return null
+  }
+}
 
 function fallbackGraphics(kind: string, color: string, size: number): Graphics {
   const g = new Graphics()
@@ -31,7 +61,9 @@ export function StudioCanvas() {
   const appRef = useRef<Application | null>(null)
   const containersRef = useRef<Map<string, Container>>(new Map())
   const bgContainerRef = useRef<Container | null>(null)
+  const overlayRef = useRef<Container | null>(null)
   const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null)
+  const transformDragRef = useRef<TransformDrag | null>(null)
 
   const scene = useStudioStore((s) => s.scene)
   const tracks = useStudioStore((s) => s.tracks)
@@ -40,10 +72,13 @@ export function StudioCanvas() {
   const selectedId = useStudioStore((s) => s.selectedId)
   const isPlaying = useStudioStore((s) => s.isPlaying)
   const playheadTime = useStudioStore((s) => s.playheadTime)
+  const durationSetting = useStudioStore((s) => s.duration)
   const setPlayhead = useStudioStore((s) => s.setPlayhead)
   const select = useStudioStore((s) => s.select)
   const moveSelected = useStudioStore((s) => s.moveSelected)
   const endDrag = useStudioStore((s) => s.endDrag)
+  const transformSelected = useStudioStore((s) => s.transformSelected)
+  const endTransform = useStudioStore((s) => s.endTransform)
   const playedAudioRef = useRef<Set<string>>(new Set())
   const playheadRef = useRef(0)
   const canvasRoRef = useRef<ResizeObserver | null>(null)
@@ -82,21 +117,49 @@ export function StudioCanvas() {
 
         app.stage.eventMode = 'static'
         app.stage.hitArea = app.screen
+        app.stage.sortableChildren = true
+
+        const overlay = new Container()
+        overlay.eventMode = 'static'
+        overlay.zIndex = 1000
+        overlay.visible = false
+        app.stage.addChild(overlay)
+        overlayRef.current = overlay
+
+        app.stage.on('pointerdown', () => {
+          if (!dragRef.current) select(null)
+        })
 
         app.stage.on('pointermove', (event) => {
           const drag = dragRef.current
-          if (!drag) return
-          moveSelected(event.global.x - drag.offsetX, event.global.y - drag.offsetY)
+          if (drag) {
+            moveSelected(event.global.x - drag.offsetX, event.global.y - drag.offsetY)
+            return
+          }
+          const transform = transformDragRef.current
+          if (transform) {
+            handleTransformMove(transform, event.global.x, event.global.y, transformSelected)
+          }
         })
         app.stage.on('pointerup', () => {
           const hadDrag = dragRef.current !== null
           dragRef.current = null
           if (hadDrag) endDrag()
+          const transform = transformDragRef.current
+          if (transform) {
+            transformDragRef.current = null
+            endTransform(transform.mode)
+          }
         })
         app.stage.on('pointerupoutside', () => {
           const hadDrag = dragRef.current !== null
           dragRef.current = null
           if (hadDrag) endDrag()
+          const transform = transformDragRef.current
+          if (transform) {
+            transformDragRef.current = null
+            endTransform(transform.mode)
+          }
         })
       })
       .catch((error) => {
@@ -132,11 +195,14 @@ export function StudioCanvas() {
     container.eventMode = 'none'
     const sprite = new Sprite(Texture.WHITE)
     sprite.tint = 0x88aacc
-    void Assets.load(background.mediaUrl)
+    void loadSvgTexture(background.mediaUrl)
       .then((texture) => {
-        sprite.texture = texture
-        sprite.width = WIDTH
-        sprite.height = HEIGHT
+        if (texture) {
+          sprite.texture = texture
+          sprite.width = WIDTH
+          sprite.height = HEIGHT
+          sprite.tint = 0xffffff
+        }
       })
       .catch(() => {
         sprite.tint = 0x88aacc
@@ -190,6 +256,22 @@ export function StudioCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.objects, selectedId, isPlaying])
 
+  // Draw the selection/transform overlay around the selected object
+  useEffect(() => {
+    const overlay = overlayRef.current
+    if (!overlay) return
+    const object = selectedId ? selectObject(scene, selectedId) : undefined
+    if (isPlaying || !object || !object.visible) {
+      overlay.visible = false
+      return
+    }
+    overlay.visible = true
+    buildSelectionOverlay(overlay, object, (mode, handleLocal) =>
+      beginHandleDrag(transformDragRef, mode, handleLocal),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene, selectedId, isPlaying])
+
   // Playback: advance playhead and apply sampled transforms
   useEffect(() => {
     const app = appRef.current
@@ -197,7 +279,7 @@ export function StudioCanvas() {
     playedAudioRef.current.clear()
     const tick = () => {
       const dt = app.ticker.deltaMS / 1000
-      const duration = trackDuration(tracks)
+      const duration = Math.max(durationSetting, contentDuration(tracks, audio), 1)
       const next = playheadRef.current + dt
       const wrapped = duration > 0 && next >= duration
       const time = duration > 0 ? (next % duration) : next
@@ -228,31 +310,150 @@ export function StudioCanvas() {
       app.ticker.remove(tick)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, tracks, scene.objects, audio])
-
-  const selected = selectObject(scene, selectedId)
+  }, [isPlaying, tracks, scene.objects, audio, durationSetting])
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2rem] border-2 border-white bg-gradient-to-b from-sky-100 to-brand-50 p-3 shadow-soft">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2rem] border-2 border-white bg-gradient-to-b from-sky-100 to-brand-50 p-2.5 shadow-soft">
         <div ref={mountRef} className="studio-canvas-mount" />
       </div>
-      {selected && (
-        <p className="shrink-0 rounded-2xl bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-soft">
-          Selected: <span className="font-display text-sm font-semibold text-slate-800">{selected.name}</span>
-          <span className="text-slate-300"> · </span>x {selected.x.toFixed(0)} · y {selected.y.toFixed(0)} ·{' '}
-          {selected.rotation}° · size {selected.scale.toFixed(2)} · {playheadTime.toFixed(1)}s
-        </p>
-      )}
     </div>
   )
+}
+
+interface TransformDrag {
+  mode: 'resize' | 'rotate'
+  objectId: string
+  startScale: number
+  startRotation: number
+  centerX: number
+  centerY: number
+  handleLocal: { x: number; y: number }
+}
+
+function beginHandleDrag(
+  ref: { current: TransformDrag | null },
+  mode: 'resize' | 'rotate',
+  handleLocal: { x: number; y: number },
+) {
+  const { scene, selectedId } = useStudioStore.getState()
+  const object = selectedId ? selectObject(scene, selectedId) : undefined
+  if (!object) return
+  const rad = (object.rotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  ref.current = {
+    mode,
+    objectId: object.id,
+    startScale: object.scale,
+    startRotation: object.rotation,
+    centerX: object.x + (BOX / 2) * object.scale * (cos - sin),
+    centerY: object.y + (BOX / 2) * object.scale * (sin + cos),
+    handleLocal,
+  }
+}
+
+function handleTransformMove(
+  drag: TransformDrag,
+  wx: number,
+  wy: number,
+  transformSelected: (t: { x?: number; y?: number; rotation?: number; scale?: number }) => void,
+) {
+  const object = selectObject(useStudioStore.getState().scene, drag.objectId)
+  if (!object) return
+  if (drag.mode === 'rotate') {
+    const angle = (Math.atan2(wy - drag.centerY, wx - drag.centerX) * 180) / Math.PI
+    transformSelected({ rotation: angle + 90 })
+    return
+  }
+  const rad = (drag.startRotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const dx = wx - object.x
+  const dy = wy - object.y
+  const localX = (dx * cos + dy * sin) / object.scale
+  const localY = (-dx * sin + dy * cos) / object.scale
+  const dist = Math.hypot(localX - BOX / 2, localY - BOX / 2)
+  const rest = Math.hypot(drag.handleLocal.x - BOX / 2, drag.handleLocal.y - BOX / 2)
+  const scale = rest > 0 ? drag.startScale * (dist / rest) : drag.startScale
+  const half = (BOX / 2) * scale
+  transformSelected({
+    x: drag.centerX - half * (cos - sin),
+    y: drag.centerY - half * (sin + cos),
+    scale,
+  })
+}
+
+function buildSelectionOverlay(
+  overlay: Container,
+  object: StudioObject,
+  onHandleDown: (mode: 'resize' | 'rotate', handleLocal: { x: number; y: number }) => void,
+) {
+  overlay.removeChildren().forEach((child) => child.destroy({ children: true }))
+  overlay.x = object.x
+  overlay.y = object.y
+  overlay.rotation = (object.rotation * Math.PI) / 180
+  overlay.scale.set(object.scale)
+
+  const box = new Graphics()
+  box.rect(0, 0, BOX, BOX).stroke({ color: HANDLE_COLOR, width: 3 }).fill({ color: HANDLE_COLOR, alpha: 0.07 })
+  overlay.addChild(box)
+
+  const corners: { x: number; y: number }[] = [
+    { x: 0, y: 0 },
+    { x: BOX, y: 0 },
+    { x: BOX, y: BOX },
+    { x: 0, y: BOX },
+  ]
+  for (const corner of corners) {
+    const handle = new Graphics()
+    handle.circle(corner.x, corner.y, 7).fill(0xffffff).stroke({ color: HANDLE_COLOR, width: 3 })
+    handle.cursor = 'nwse-resize'
+    handle.eventMode = 'static'
+    handle.on('pointerdown', (event) => {
+      event.stopPropagation()
+      onHandleDown('resize', corner)
+    })
+    overlay.addChild(handle)
+  }
+
+  const rotateLine = new Graphics()
+  rotateLine
+    .moveTo(BOX / 2, 0)
+    .lineTo(BOX / 2, -24)
+    .stroke({ color: HANDLE_COLOR, width: 3 })
+  overlay.addChild(rotateLine)
+
+  const rotateHandle = new Graphics()
+  rotateHandle.circle(BOX / 2, -24, 8).fill(HANDLE_COLOR).stroke({ color: 0xffffff, width: 3 })
+  rotateHandle.cursor = 'grab'
+  rotateHandle.eventMode = 'static'
+  rotateHandle.on('pointerdown', (event) => {
+    event.stopPropagation()
+    onHandleDown('rotate', { x: BOX / 2, y: -24 })
+  })
+  overlay.addChild(rotateHandle)
+
+  const label = new Text({
+    text: object.name,
+    style: { fontSize: 12, fontWeight: '700', fill: 0xffffff, fontFamily: 'Arial, sans-serif' },
+  })
+  label.anchor.set(0.5)
+  const labelBg = new Graphics()
+  labelBg
+    .roundRect(-label.width / 2 - 6, -label.height / 2 - 2, label.width + 12, label.height + 4, 6)
+    .fill(HANDLE_COLOR)
+  const labelGroup = new Container()
+  labelGroup.position.set(BOX / 2, -52)
+  labelGroup.addChild(labelBg, label)
+  overlay.addChild(labelGroup)
 }
 
 async function hydrateSprite(container: Container, mediaUrl: string | null) {
   const existing = container.children.find((c) => c instanceof Sprite)
   if (mediaUrl) {
     const cached = textureCache.get(mediaUrl)
-    const texture = cached ?? (await Assets.load(mediaUrl).catch(() => null))
+    const texture = cached ?? (await loadSvgTexture(mediaUrl))
     if (!texture) return
     if (!textureCache.has(mediaUrl)) textureCache.set(mediaUrl, texture)
     if (existing instanceof Sprite) {

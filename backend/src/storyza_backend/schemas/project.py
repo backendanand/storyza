@@ -73,9 +73,10 @@ class ProjectDocument(BaseModel):
             raise ValueError("schema_version must be >= 1")
         if self.renderer_version != "v1":
             raise ValueError("unsupported renderer_version")
-        self.duration = max(
+        content_max = max(
             (k.t for track in self.animation_tracks for k in track.keyframes), default=0.0
         )
+        self.duration = max(self.duration, content_max)
         return self
 
 

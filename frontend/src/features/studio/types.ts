@@ -195,6 +195,7 @@ export function toProjectDocument(input: {
   scene: StudioScene
   tracks: AnimationTrack[]
   audio: AudioClip[]
+  duration?: number
 }): ProjectDocument {
   return {
     schema_version: 1,
@@ -205,7 +206,7 @@ export function toProjectDocument(input: {
     animation_tracks: input.tracks.map(trackToBackend),
     audio: input.audio.map(audioToBackend),
     export_settings: {},
-    duration: 0,
+    duration: input.duration ?? 0,
   }
 }
 
@@ -214,6 +215,7 @@ export function fromProjectDocument(doc: ProjectDocument): {
   scene: StudioScene
   tracks: AnimationTrack[]
   audio: AudioClip[]
+  duration: number
 } {
   const scene = doc.scenes?.[0] ? sceneFromBackend(doc.scenes[0]) : { id: 'scene-main', name: 'Scene 1', backgroundId: null, objects: [] }
   return {
@@ -221,6 +223,7 @@ export function fromProjectDocument(doc: ProjectDocument): {
     scene,
     tracks: (doc.animation_tracks ?? []).map(trackFromBackend),
     audio: (doc.audio ?? []).map(audioFromBackend),
+    duration: doc.duration ?? 0,
   }
 }
 
@@ -228,4 +231,9 @@ export function trackDuration(tracks: AnimationTrack[]): number {
   return tracks.reduce((max, track) => {
     return Math.max(max, ...track.keyframes.map((k) => k.t))
   }, 0)
+}
+
+export function contentDuration(tracks: AnimationTrack[], audio: AudioClip[]): number {
+  const audioEnd = audio.reduce((max, clip) => Math.max(max, clip.startTime + clip.duration), 0)
+  return Math.max(trackDuration(tracks), audioEnd)
 }

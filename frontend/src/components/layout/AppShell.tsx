@@ -1,16 +1,11 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { Loader2, Save } from 'lucide-react'
+import { FolderOpen, History } from 'lucide-react'
 
 import { useAuthStore } from '../../stores/auth'
 import { cn } from '../../lib/utils'
-import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import {
-  triggerSaveNow,
-  useStudioStore,
-  type SaveState,
-} from '../../features/studio/studioStore'
+import { useStudioStore } from '../../features/studio/studioStore'
 
 const navItem = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -31,24 +26,15 @@ function initials(name: string | null | undefined): string {
     .toUpperCase()
 }
 
-const saveMeta: Record<SaveState, { label: string; variant: 'success' | 'info' | 'danger'; icon?: string }> = {
-  idle: { label: '', variant: 'info' },
-  saving: { label: 'Saving…', variant: 'info', icon: '⏳' },
-  saved: { label: 'Saved', variant: 'success', icon: '✓' },
-  error: { label: "Oops — couldn't save", variant: 'danger', icon: '⚠️' },
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const location = useLocation()
   const inStudio = location.pathname.startsWith('/studio')
 
-  const title = useStudioStore((s) => s.title)
-  const setTitle = useStudioStore((s) => s.setTitle)
-  const saveState = useStudioStore((s) => s.saveState)
-  const saveError = useStudioStore((s) => s.saveError)
-  const meta = saveMeta[saveState]
+  const hasVersions = useStudioStore((s) => s.hasVersions)
+  const setProjectsModalOpen = useStudioStore((s) => s.setProjectsModalOpen)
+  const setVersionsModalOpen = useStudioStore((s) => s.setVersionsModalOpen)
 
   return (
     <div className="flex h-dvh flex-col">
@@ -62,24 +48,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           {inStudio && (
-            <div className="flex min-w-0 flex-1 items-center justify-center gap-3 px-4">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Name your project ✏️"
-                className="h-10 min-w-0 max-w-sm flex-1 rounded-2xl border-2 border-slate-100 bg-white px-4 font-display text-base text-slate-900 transition-colors focus:border-brand-300 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-              />
-              {meta.label && (
-                <Badge variant={meta.variant} icon={meta.icon} className="hidden sm:inline-flex">
-                  {meta.label}
-                </Badge>
-              )}
-              {saveState === 'error' && saveError && (
-                <span className="hidden text-xs font-semibold text-coral-700 lg:inline">{saveError}</span>
-              )}
-              <Button size="sm" onClick={triggerSaveNow} disabled={saveState === 'saving'} className="px-4">
-                {saveState === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save
+            <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-4">
+              <Button variant="outline" size="sm" onClick={() => setProjectsModalOpen(true)}>
+                <FolderOpen className="h-4 w-4" /> My projects
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVersionsModalOpen(true)}
+                disabled={!hasVersions}
+              >
+                <History className="h-4 w-4" /> Versions
               </Button>
             </div>
           )}
