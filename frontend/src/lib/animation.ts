@@ -70,3 +70,21 @@ export function applySampled(
     visible: typeof sampled.visible === 'boolean' ? sampled.visible : base.visible,
   }
 }
+
+/**
+ * Apply DELTA overrides (from a named animation's tracks) on top of a base
+ * object's pose. Used to preview reusable animations like "Jump" or "Run".
+ */
+export function applyAnimationDeltas(
+  base: StudioObject,
+  deltas: SampledValue | undefined,
+): StudioObject {
+  if (!deltas) return base
+  return {
+    ...base,
+    x: typeof deltas.x === 'number' ? base.x + deltas.x : base.x,
+    y: typeof deltas.y === 'number' ? base.y + deltas.y : base.y,
+    rotation: typeof deltas.rotation === 'number' ? base.rotation + deltas.rotation : base.rotation,
+    scale: typeof deltas.scale === 'number' ? base.scale + deltas.scale : base.scale,
+  }
+}

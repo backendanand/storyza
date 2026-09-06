@@ -7,9 +7,10 @@ import {
   Eye,
   Mic,
   Minus,
-  Plus,
   Play,
+  Plus,
   RotateCw,
+  Square,
   Trash2,
   Volume2,
   X,
@@ -18,6 +19,7 @@ import {
 
 import { cn } from '../../lib/utils'
 import { playClip, recordVoice, type SfxPreset } from './audio/sfx'
+import { presetByName, presetAnimations } from './animationPresets'
 import { selectObject, useStudioStore, tracksForObject } from './studioStore'
 import { contentDuration, type AudioClip, type TrackProperty } from './types'
 
@@ -36,15 +38,19 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
   const dragSeekRef = useRef(false)
   const keyframeDragRef = useRef<{ trackId: string; currentTime: number } | null>(null)
   const [recordingNotice, setRecordingNotice] = useState<string | null>(null)
+  const [animMenuOpen, setAnimMenuOpen] = useState(false)
 
   const scene = useStudioStore((s) => s.scene)
   const tracks = useStudioStore((s) => s.tracks)
   const audio = useStudioStore((s) => s.audio)
+  const animations = useStudioStore((s) => s.animations)
   const selectedId = useStudioStore((s) => s.selectedId)
   const selectedKeyframe = useStudioStore((s) => s.selectedKeyframe)
   const playheadTime = useStudioStore((s) => s.playheadTime)
   const isPlaying = useStudioStore((s) => s.isPlaying)
   const recording = useStudioStore((s) => s.recording)
+  const previewAnimation = useStudioStore((s) => s.previewAnimation)
+  const recordingAnimation = useStudioStore((s) => s.recordingAnimation)
   const durationSetting = useStudioStore((s) => s.duration)
   const setDuration = useStudioStore((s) => s.setDuration)
   const setPlayhead = useStudioStore((s) => s.setPlayhead)
@@ -55,9 +61,21 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
   const selectKeyframe = useStudioStore((s) => s.selectKeyframe)
   const addAudio = useStudioStore((s) => s.addAudio)
   const removeAudio = useStudioStore((s) => s.removeAudio)
+  const addAnimation = useStudioStore((s) => s.addAnimation)
+  const removeAnimation = useStudioStore((s) => s.removeAnimation)
+  const setPreviewAnimation = useStudioStore((s) => s.setPreviewAnimation)
+  const startAnimationRecording = useStudioStore((s) => s.startAnimationRecording)
+  const stopAnimationRecording = useStudioStore((s) => s.stopAnimationRecording)
+  const addAnimationToTimeline = useStudioStore((s) => s.addAnimationToTimeline)
 
   const selected = selectObject(scene, selectedId)
   const selectedTracks = selected ? tracksForObject(tracks, selected.id) : []
+  const objectAnimations = selected
+    ? animations.filter((a) => a.objectId === selected.id)
+    : []
+  const recordingFor = recordingAnimation
+    ? selectObject(scene, recordingAnimation.objectId)
+    : undefined
 
   const duration = Math.max(durationSetting, contentDuration(tracks, audio), 1)
   const timelineWidth = duration * PX_PER_SEC
@@ -140,6 +158,22 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
 
   const seconds = Array.from({ length: Math.ceil(duration) }, (_, i) => i + 1)
 
+  const createPresetAnimation = (presetName: string) => {
+    if (!selected) return
+    const preset = presetByName(presetName)
+    if (!preset) return
+    const animation = preset.make(selected)
+    addAnimation(animation)
+    setPreviewAnimation({ objectId: selected.id, animationId: animation.id })
+    setAnimMenuOpen(false)
+  }
+
+  const startCustomRecording = () => {
+    if (!selected) return
+    const started = startAnimationRecording()
+    if (started) setAnimMenuOpen(false)
+  }
+
   return (
     <div className="w-full rounded-3xl border-2 border-white bg-white p-2.5 shadow-soft">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -214,6 +248,106 @@ export function Timeline({ onClose }: { onClose?: () => void }) {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Animator: named reusable animations for the selected object */}
+      <div className="mb-2 rounded-2xl border-2 border-slate-100 bg-slate-50/70 px-2.5 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[11px] font-bold text-slate-500">🎬 Animations</span>
+          {recordingAnimation ? (
+            <button
+              onClick={stopAnimationRecording}
+              className="flex h-7 items-center gap-1.5 rounded-full bg-coral-500 px-3 text-[11px] font-bold text-white shadow-candy transition-colors hover:bg-coral-600"
+            >
+              <Square className="h-3 w-3 fill-current" /> Stop & save “{recordingAnimation.name}”
+            </button>
+          ) : (
+            selected && (
+              <div className="relative">
+                <button
+                  onClick={() => setAnimMenuOpen((open) => !open)}
+                  className="flex h-7 items-center gap-1 rounded-full bg-brand-600 px-3 text-[11px] font-bold text-white shadow-lift transition-colors hover:bg-brand-700"
+                >
+                  <Plus className="h-3.5 w-3.5" /> New
+                </button>
+                {animMenuOpen && (
+                  <div className="absolute right-0 z-40 mt-1 w-40 rounded-2xl border-2 border-slate-100 bg-white p-1.5 shadow-lift">
+                    {presetAnimations(selected).map((animation) => (
+                      <button
+                        key={animation.name}
+                        onClick={() => createPresetAnimation(animation.name)}
+                        className="flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-brand-50 hover:text-brand-700"
+                      >
+                        <span aria-hidden>{animation.name === 'Jump' ? '🦘' : animation.name === 'Spin' ? '🌀' : animation.name === 'Wiggle' ? '🐛' : animation.name === 'Run' ? '🏃' : animation.name === 'Idle' ? '😌' : '😋'}</span>
+                        {animation.name}
+                      </button>
+                    ))}
+                    <div className="my-1 h-px bg-slate-100" />
+                    <button
+                      onClick={startCustomRecording}
+                      className="flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-xs font-bold text-slate-600 transition-colors hover:bg-brand-50 hover:text-brand-700"
+                    >
+                      🎤 Record custom
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          )}
+        </div>
+
+        {recordingAnimation ? (
+          <p className="mt-1.5 text-[11px] font-semibold text-coral-700">
+            Move, turn or resize {recordingFor?.name ?? 'the object'} to capture its motion
+            (time loops every 2s). Press stop when you're happy! ✨
+          </p>
+        ) : (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {objectAnimations.length === 0 && (
+              <p className="text-[11px] font-semibold text-slate-400">
+                {selected ? 'No animations yet — make one with New! ✨' : 'Pick an object to add animations.'}
+              </p>
+            )}
+            {objectAnimations.map((animation) => {
+              const isPreviewing = previewAnimation?.animationId === animation.id
+              return (
+                <div
+                  key={animation.id}
+                  className="flex items-center gap-0.5 rounded-full border-2 border-slate-100 bg-white py-0.5 pr-1 pl-2.5"
+                >
+                  <span className="text-[11px] font-bold text-slate-600">{animation.name}</span>
+                  <button
+                    onClick={() => setPreviewAnimation({ objectId: animation.objectId, animationId: animation.id })}
+                    disabled={isPlaying}
+                    title="Preview this animation"
+                    className={cn(
+                      'flex h-6 w-6 items-center justify-center rounded-full transition-colors',
+                      isPreviewing ? 'bg-brand-600 text-white' : 'text-slate-500 hover:bg-brand-50 hover:text-brand-600',
+                    )}
+                  >
+                    {isPreviewing ? <Square className="h-3 w-3 fill-current" /> : <Play className="h-3 w-3 fill-current" />}
+                  </button>
+                  <button
+                    onClick={() => addAnimationToTimeline(animation.id)}
+                    disabled={isPlaying}
+                    title="Add to the timeline at the playhead"
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-mint-50 hover:text-mint-600"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => removeAnimation(animation.id)}
+                    disabled={isPlaying}
+                    title="Delete this animation"
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-coral-50 hover:text-coral-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">

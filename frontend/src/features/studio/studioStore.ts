@@ -1,9 +1,13 @@
 import { create } from 'zustand'
 
+import { sampleScene } from '../../lib/animation'
+import { presetByName } from './animationPresets'
+import { RECORD_WINDOW } from './types'
 import type {
   AnimationTrack,
   AudioClip,
   Keyframe,
+  ObjectAnimation,
   SceneObjectKind,
   StudioObject,
   StudioScene,
@@ -40,6 +44,17 @@ export interface SceneBackground {
   mediaUrl: string
 }
 
+export interface PreviewAnimation {
+  objectId: string
+  animationId: string
+}
+
+export interface RecordingAnimation {
+  objectId: string
+  name: string
+  startPose: { x: number; y: number; rotation: number; scale: number }
+}
+
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 let saveNowHandler: (() => void) | null = null
@@ -58,6 +73,7 @@ interface StudioState {
   scene: StudioScene
   tracks: AnimationTrack[]
   audio: AudioClip[]
+  animations: ObjectAnimation[]
   background: SceneBackground | null
   duration: number
   selectedId: string | null
@@ -65,6 +81,8 @@ interface StudioState {
   isPlaying: boolean
   playheadTime: number
   recording: boolean
+  previewAnimation: PreviewAnimation | null
+  recordingAnimation: RecordingAnimation | null
   saveState: SaveState
   saveError: string | null
   projectsModalOpen: boolean
@@ -85,6 +103,7 @@ interface StudioState {
     scene: StudioScene
     tracks: AnimationTrack[]
     audio: AudioClip[]
+    animations?: ObjectAnimation[]
     background: SceneBackground | null
     duration?: number
     projectId?: string | null
@@ -116,6 +135,14 @@ interface StudioState {
 
   addAudio: (clip: AudioClip) => void
   removeAudio: (id: string) => void
+  setAnimations: (animations: ObjectAnimation[]) => void
+  addAnimation: (animation: ObjectAnimation) => void
+  removeAnimation: (animationId: string) => void
+  renameAnimation: (animationId: string, name: string) => void
+  setPreviewAnimation: (preview: PreviewAnimation | null) => void
+  startAnimationRecording: (name?: string) => boolean
+  stopAnimationRecording: () => void
+  addAnimationToTimeline: (animationId: string) => void
   reset: () => void
 }
 
@@ -128,12 +155,34 @@ function upsertKeyframe(keyframes: Keyframe[], keyframe: Keyframe): Keyframe[] {
   return ensureSorted([...without, keyframe])
 }
 
+function mergeKeyframes(a: Keyframe[], b: Keyframe[]): Keyframe[] {
+  const byTime = new Map<number, Keyframe>()
+  for (const keyframe of [...a, ...b]) byTime.set(keyframe.t, keyframe)
+  return ensureSorted([...byTime.values()])
+}
+
+/** Drop middle keyframes that don't change value, so recordings stay tidy. */
+function compressKeyframes(keyframes: Keyframe[]): Keyframe[] {
+  if (keyframes.length < 3) return keyframes
+  const result: Keyframe[] = [keyframes[0]]
+  const same = (a: number, b: number) => Math.abs(a - b) < 0.5
+  for (let i = 1; i < keyframes.length - 1; i++) {
+    const prev = Number(result[result.length - 1].value)
+    const curr = Number(keyframes[i].value)
+    const next = Number(keyframes[i + 1].value)
+    if (!(same(prev, curr) && same(curr, next))) result.push(keyframes[i])
+  }
+  result.push(keyframes[keyframes.length - 1])
+  return result
+}
+
 export const useStudioStore = create<StudioState>((set, get) => ({
   title: 'My Story',
   projectId: null,
   scene: initialScene,
   tracks: [],
   audio: [],
+  animations: [],
   background: null,
   duration: 5,
   selectedId: null,
@@ -141,6 +190,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   isPlaying: false,
   playheadTime: 0,
   recording: false,
+  previewAnimation: null,
+  recordingAnimation: null,
   saveState: 'idle',
   saveError: null,
   projectsModalOpen: false,
@@ -169,12 +220,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       playheadTime: 0,
     }),
 
-  loadDocument: ({ title, scene, tracks, audio, background, duration, projectId = null }) =>
+  loadDocument: ({ title, scene, tracks, audio, animations = [], background, duration, projectId = null }) =>
     set({
       title,
       scene,
       tracks,
       audio,
+      animations,
       background,
       duration: duration ?? 5,
       projectId,
@@ -183,6 +235,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       isPlaying: false,
       playheadTime: 0,
       recording: false,
+      previewAnimation: null,
+      recordingAnimation: null,
     }),
 
   addObject: (kind, asset) => {
@@ -286,6 +340,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         objects: scene.objects.map((o) => (o.id === selectedId ? { ...o, x, y } : o)),
       },
     })
+    if (get().recordingAnimation) {
+      get()._recordProperty(selectedId, 'x')
+      get()._recordProperty(selectedId, 'y')
+    }
   },
 
   transformSelected: ({ x, y, rotation, scale }) => {
@@ -307,6 +365,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         ),
       },
     })
+    if (get().recordingAnimation) {
+      get()._recordProperty(selectedId, 'rotation')
+      get()._recordProperty(selectedId, 'scale')
+      if (x !== undefined) get()._recordProperty(selectedId, 'x')
+      if (y !== undefined) get()._recordProperty(selectedId, 'y')
+    }
   },
 
   endTransform: (mode) => {
@@ -401,6 +465,147 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   addAudio: (clip) => set({ audio: [...get().audio, clip] }),
   removeAudio: (id) => set({ audio: get().audio.filter((c) => c.id !== id) }),
 
+  setAnimations: (animations) => set({ animations }),
+
+  addAnimation: (animation) =>
+    set({ animations: [...get().animations, animation] }),
+
+  removeAnimation: (animationId) => {
+    set({
+      animations: get().animations.filter((a) => a.id !== animationId),
+      previewAnimation:
+        get().previewAnimation?.animationId === animationId ? null : get().previewAnimation,
+    })
+  },
+
+  renameAnimation: (animationId, name) =>
+    set({
+      animations: get().animations.map((a) =>
+        a.id === animationId ? { ...a, name: name || a.name } : a,
+      ),
+    }),
+
+  setPreviewAnimation: (previewAnimation) => set({ previewAnimation }),
+
+  startAnimationRecording: (name) => {
+    const { scene, selectedId, animations } = get()
+    const object = selectedId ? scene.objects.find((o) => o.id === selectedId) : undefined
+    if (!object) return false
+    const count = animations.filter((a) => a.objectId === object.id).length
+    set({
+      recordingAnimation: {
+        objectId: object.id,
+        name: name?.trim() || `Custom ${count + 1}`,
+        startPose: { x: object.x, y: object.y, rotation: object.rotation, scale: object.scale },
+      },
+      recording: true,
+      isPlaying: true,
+      playheadTime: 0,
+      previewAnimation: null,
+    })
+    return true
+  },
+
+  stopAnimationRecording: () => {
+    const { recordingAnimation, tracks } = get()
+    if (!recordingAnimation) return
+    const { objectId, name, startPose } = recordingAnimation
+    const window = RECORD_WINDOW
+
+    const captured: AnimationTrack[] = []
+    for (const track of tracks) {
+      if (track.objectId !== objectId || track.property === 'visible') continue
+      const keyframes = track.keyframes.filter((k) => k.t <= window)
+      if (keyframes.length === 0) continue
+      captured.push({
+        id: `anim-${Date.now()}-${track.property}`,
+        objectId,
+        property: track.property,
+        keyframes: ensureSorted(
+          compressKeyframes(
+            keyframes.map((k) => ({
+              ...k,
+              value:
+                Number(k.value) -
+                Number(startPose[track.property as 'x' | 'y' | 'rotation' | 'scale'] ?? 0),
+            })),
+          ),
+        ),
+      })
+    }
+
+    const cleaned = tracks
+      .map((track) =>
+        track.objectId === objectId && track.property !== 'visible'
+          ? { ...track, keyframes: track.keyframes.filter((k) => k.t > window) }
+          : track,
+      )
+      .filter((track) => track.keyframes.length > 0)
+
+    const updates: Partial<StudioState> = {
+      tracks: cleaned,
+      recording: false,
+      recordingAnimation: null,
+      isPlaying: false,
+      playheadTime: 0,
+    }
+    if (captured.length > 0) {
+      const duration = Math.max(
+        0.1,
+        ...captured.flatMap((track) => track.keyframes.map((k) => k.t)),
+      )
+      updates.animations = [
+        ...get().animations,
+        { id: `anim-${Date.now()}`, objectId, name, duration, tracks: captured },
+      ]
+    }
+    set(updates)
+  },
+
+  addAnimationToTimeline: (animationId) => {
+    const { animations, tracks, scene, playheadTime } = get()
+    const animation = animations.find((a) => a.id === animationId)
+    if (!animation) return
+    const object = scene.objects.find((o) => o.id === animation.objectId)
+    if (!object) return
+
+    const sampled = sampleScene(tracks, playheadTime).get(object.id) ?? {}
+    const base = {
+      x: typeof sampled.x === 'number' ? sampled.x : object.x,
+      y: typeof sampled.y === 'number' ? sampled.y : object.y,
+      rotation: typeof sampled.rotation === 'number' ? sampled.rotation : object.rotation,
+      scale: typeof sampled.scale === 'number' ? sampled.scale : object.scale,
+    }
+
+    const result = [...tracks]
+    for (const animTrack of animation.tracks) {
+      if (animTrack.property === 'visible') continue
+      const prop = animTrack.property
+      const keyframes = animTrack.keyframes
+        .map((k) => ({
+          t: playheadTime + k.t,
+          value: Number(base[prop]) + Number(k.value),
+          easing: k.easing,
+        }))
+        .sort((a, b) => a.t - b.t)
+      const existingIndex = result.findIndex(
+        (t) => t.objectId === object.id && t.property === prop,
+      )
+      if (existingIndex >= 0) {
+        const existing = result[existingIndex]
+        result[existingIndex] = { ...existing, keyframes: mergeKeyframes(existing.keyframes, keyframes) }
+      } else {
+        result.push({
+          id: `track-${Date.now()}-${prop}`,
+          objectId: object.id,
+          property: prop,
+          keyframes,
+        })
+      }
+    }
+    set({ tracks: result })
+  },
+
   reset: () =>
     set({
       title: 'My Story',
@@ -408,6 +613,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       scene: initialScene,
       tracks: [],
       audio: [],
+      animations: [],
       background: null,
       duration: 5,
       selectedId: null,
@@ -415,6 +621,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       isPlaying: false,
       playheadTime: 0,
       recording: false,
+      previewAnimation: null,
+      recordingAnimation: null,
       saveState: 'idle',
       saveError: null,
       projectsModalOpen: false,
@@ -425,6 +633,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
 export function selectObject(scene: StudioScene, id: string | null): StudioObject | undefined {
   return scene.objects.find((o) => o.id === id)
+}
+
+// Dev/testing hook: lets browser automation drive the store directly (dev only).
+if (import.meta.env.DEV) {
+  const w = window as unknown as {
+    __storyzaStore?: typeof useStudioStore
+    __storyzaPreset?: typeof presetByName
+  }
+  w.__storyzaStore = useStudioStore
+  w.__storyzaPreset = presetByName
 }
 
 export function tracksForObject(tracks: AnimationTrack[], objectId: string): AnimationTrack[] {

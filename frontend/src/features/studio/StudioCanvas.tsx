@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Application, Container, Graphics, ImageSource, Sprite, Text, Texture } from 'pixi.js'
 
-import { applySampled, sampleScene } from '../../lib/animation'
-import { contentDuration, type StudioObject } from './types'
+import { applyAnimationDeltas, applySampled, sampleScene } from '../../lib/animation'
+import { contentDuration, RECORD_WINDOW, type StudioObject } from './types'
 import { selectObject, useStudioStore } from './studioStore'
 import { playClip } from './audio/sfx'
 
@@ -68,11 +68,15 @@ export function StudioCanvas() {
   const scene = useStudioStore((s) => s.scene)
   const tracks = useStudioStore((s) => s.tracks)
   const audio = useStudioStore((s) => s.audio)
+  const animations = useStudioStore((s) => s.animations)
   const background = useStudioStore((s) => s.background)
   const selectedId = useStudioStore((s) => s.selectedId)
   const isPlaying = useStudioStore((s) => s.isPlaying)
   const playheadTime = useStudioStore((s) => s.playheadTime)
   const durationSetting = useStudioStore((s) => s.duration)
+  const previewAnimation = useStudioStore((s) => s.previewAnimation)
+  const recordingAnimation = useStudioStore((s) => s.recordingAnimation)
+  const setPreviewAnimation = useStudioStore((s) => s.setPreviewAnimation)
   const setPlayhead = useStudioStore((s) => s.setPlayhead)
   const select = useStudioStore((s) => s.select)
   const moveSelected = useStudioStore((s) => s.moveSelected)
@@ -91,6 +95,11 @@ export function StudioCanvas() {
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
+
+    if (import.meta.env.DEV) {
+      ;(window as unknown as { __storyzaContainers?: Map<string, Container> }).__storyzaContainers =
+        containersRef.current
+    }
 
     const app = new Application()
     const containers = containersRef.current
@@ -279,7 +288,9 @@ export function StudioCanvas() {
     playedAudioRef.current.clear()
     const tick = () => {
       const dt = app.ticker.deltaMS / 1000
-      const duration = Math.max(durationSetting, contentDuration(tracks, audio), 1)
+      const duration = recordingAnimation
+        ? RECORD_WINDOW
+        : Math.max(durationSetting, contentDuration(tracks, audio), 1)
       const next = playheadRef.current + dt
       const wrapped = duration > 0 && next >= duration
       const time = duration > 0 ? (next % duration) : next
@@ -310,7 +321,42 @@ export function StudioCanvas() {
       app.ticker.remove(tick)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, tracks, scene.objects, audio, durationSetting])
+  }, [isPlaying, tracks, scene.objects, audio, durationSetting, recordingAnimation])
+
+  // Preview a named animation on its object (base pose + deltas), then restore.
+  useEffect(() => {
+    const app = appRef.current
+    if (!app || !previewAnimation) return
+    const animation = animations.find((a) => a.id === previewAnimation.animationId)
+    const object = scene.objects.find((o) => o.id === previewAnimation.objectId)
+    const container = containersRef.current.get(previewAnimation.objectId)
+    if (!animation || !object || !container) {
+      setPreviewAnimation(null)
+      return
+    }
+    const start = performance.now()
+    const tick = () => {
+      const time = Math.min((performance.now() - start) / 1000, animation.duration)
+      const deltas = sampleScene(animation.tracks, time).get(object.id)
+      const applied = applyAnimationDeltas(object, deltas)
+      container.x = applied.x
+      container.y = applied.y
+      container.rotation = (applied.rotation * Math.PI) / 180
+      container.scale.set(applied.scale)
+      if (time >= animation.duration) {
+        setPreviewAnimation(null)
+      }
+    }
+    app.ticker.add(tick)
+    return () => {
+      app.ticker.remove(tick)
+      container.x = object.x
+      container.y = object.y
+      container.rotation = (object.rotation * Math.PI) / 180
+      container.scale.set(object.scale)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewAnimation, animations, scene])
 
   return (
     <div className="flex h-full min-h-0 flex-col">

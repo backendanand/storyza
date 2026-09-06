@@ -63,6 +63,7 @@ class ProjectDocument(BaseModel):
     meta: dict = Field(default_factory=dict)
     scenes: list[SceneObject] = Field(default_factory=list)
     animation_tracks: list[AnimationTrack] = Field(default_factory=list)
+    animations: list[dict] = Field(default_factory=list)
     audio: list[dict] = Field(default_factory=list)
     export_settings: dict = Field(default_factory=dict)
     duration: float = 0.0

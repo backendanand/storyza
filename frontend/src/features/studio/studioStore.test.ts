@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { presetByName } from './animationPresets'
 import { useStudioStore } from './studioStore'
 import { toProjectDocument } from './types'
 
@@ -112,5 +113,60 @@ describe('project document', () => {
     expect(doc.renderer_version).toBe('v1')
     expect(doc.scenes[0].objects).toHaveLength(1)
     expect(doc.title).toBe('My Story')
+  })
+})
+
+describe('animator', () => {
+  it('adds and removes a named animation for an object', () => {
+    const store = useStudioStore.getState()
+    store.reset()
+    store.addObject('character')
+    const object = useStudioStore.getState().scene.objects[0]
+    const animation = presetByName('Jump')!.make(object)
+    store.addAnimation(animation)
+    expect(useStudioStore.getState().animations).toHaveLength(1)
+    store.removeAnimation(animation.id)
+    expect(useStudioStore.getState().animations).toHaveLength(0)
+  })
+
+  it('bakes a named animation into the timeline anchored to the object pose', () => {
+    const store = useStudioStore.getState()
+    store.reset()
+    store.addObject('character')
+    const object = useStudioStore.getState().scene.objects[0]
+    const animation = presetByName('Spin')!.make(object)
+    store.addAnimation(animation)
+    store.setPlayhead(1)
+    store.addAnimationToTimeline(animation.id)
+    const track = useStudioStore.getState().tracks.find((t) => t.property === 'rotation')
+    expect(track).toBeDefined()
+    const first = track!.keyframes[0]
+    const last = track!.keyframes[track!.keyframes.length - 1]
+    expect(first.t).toBe(1)
+    expect(last.t).toBe(2)
+    expect(last.value).toBeCloseTo(object.rotation + 360)
+  })
+
+  it('records a custom animation and clears the capture window from the timeline', () => {
+    const store = useStudioStore.getState()
+    store.reset()
+    store.addObject('character')
+    const object = useStudioStore.getState().scene.objects[0]
+    const started = store.startAnimationRecording('Hop')
+    expect(started).toBe(true)
+    store.setPlayhead(0.2)
+    store.moveSelected(object.x, object.y - 50)
+    store.setPlayhead(0.8)
+    store.moveSelected(object.x, object.y)
+    store.stopAnimationRecording()
+    const state = useStudioStore.getState()
+    const animation = state.animations.find((a) => a.name === 'Hop')
+    expect(animation).toBeDefined()
+    const yDelta = animation!.tracks.find((t) => t.property === 'y')
+    expect(yDelta).toBeDefined()
+    expect(yDelta!.keyframes[0].value).toBe(-50)
+    expect(state.recording).toBe(false)
+    expect(state.recordingAnimation).toBeNull()
+    expect(state.tracks.filter((t) => t.property === 'y')).toHaveLength(0)
   })
 })

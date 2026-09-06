@@ -36,7 +36,23 @@ export interface AnimationTrack {
   keyframes: Keyframe[]
 }
 
+/**
+ * A named, reusable motion for one object (e.g. "Jump", "Idle").
+ * Keyframe values are DELTAS relative to the object's pose, so the same
+ * animation can be dropped anywhere on the timeline.
+ */
+export interface ObjectAnimation {
+  id: string
+  objectId: string
+  name: string
+  duration: number
+  tracks: AnimationTrack[]
+}
+
 export type AudioKind = 'sfx' | 'voice'
+
+/** Time window (seconds) used when recording a custom named animation. */
+export const RECORD_WINDOW = 2
 
 export interface AudioClip {
   id: string
@@ -103,6 +119,7 @@ export interface ProjectDocument {
   audio: BackendAudio[]
   export_settings: Record<string, unknown>
   duration: number
+  animations?: ObjectAnimation[]
 }
 
 // ---- conversion helpers -----------------------------------------------------
@@ -196,6 +213,7 @@ export function toProjectDocument(input: {
   tracks: AnimationTrack[]
   audio: AudioClip[]
   duration?: number
+  animations?: ObjectAnimation[]
 }): ProjectDocument {
   return {
     schema_version: 1,
@@ -207,6 +225,7 @@ export function toProjectDocument(input: {
     audio: input.audio.map(audioToBackend),
     export_settings: {},
     duration: input.duration ?? 0,
+    ...(input.animations ? { animations: input.animations } : {}),
   }
 }
 
@@ -216,6 +235,7 @@ export function fromProjectDocument(doc: ProjectDocument): {
   tracks: AnimationTrack[]
   audio: AudioClip[]
   duration: number
+  animations: ObjectAnimation[]
 } {
   const scene = doc.scenes?.[0] ? sceneFromBackend(doc.scenes[0]) : { id: 'scene-main', name: 'Scene 1', backgroundId: null, objects: [] }
   return {
@@ -224,6 +244,7 @@ export function fromProjectDocument(doc: ProjectDocument): {
     tracks: (doc.animation_tracks ?? []).map(trackFromBackend),
     audio: (doc.audio ?? []).map(audioFromBackend),
     duration: doc.duration ?? 0,
+    animations: doc.animations ?? [],
   }
 }
 

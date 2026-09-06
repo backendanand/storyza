@@ -108,7 +108,14 @@ export function StudioPage() {
     }
     const s = useStudioStore.getState()
     if (!useAuthStore.getState().user) return
-    const document = toProjectDocument({ title: s.title, scene: s.scene, tracks: s.tracks, audio: s.audio, duration: s.duration })
+    const document = toProjectDocument({
+      title: s.title,
+      scene: s.scene,
+      tracks: s.tracks,
+      audio: s.audio,
+      animations: s.animations,
+      duration: s.duration,
+    })
     savingRef.current = true
     setSaveState('saving')
     setSaveError(null)
@@ -156,6 +163,7 @@ export function StudioPage() {
         state.scene !== prev.scene ||
         state.tracks !== prev.tracks ||
         state.audio !== prev.audio ||
+        state.animations !== prev.animations ||
         state.duration !== prev.duration
       if (!contentChanged) return
       if (Date.now() - lastLoadRef.current < 800) return
@@ -217,6 +225,7 @@ export function StudioPage() {
       scene,
       tracks: loaded.tracks,
       audio: loaded.audio,
+      animations: loaded.animations,
       background: bg ? { assetId: bg.id, mediaUrl: bg.media_url } : null,
       duration: loaded.duration,
       projectId: detail.id,
