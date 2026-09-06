@@ -1,0 +1,136 @@
+========================================================
+STORYZA - FRONTEND & BACKEND MANUALLY KAISE RUN KARE
+========================================================
+
+Pehle 2 cheezein ready honi chahiye:
+  1) Python 3.12  (backend ke liye)
+  2) Node.js + npm (frontend ke liye)
+  3) PostgreSQL local machine pe chal raha ho (localhost:5432)
+     database name: storyza , user: postgres , password: postgres
+     (ye .env file ke DATABASE_URL se match karta hai)
+
+NOTE: Root folder me .env hai. Backend ye .env automatically
+use karega (backend koi alag .env nahi banaya).
+
+VOICE ASSISTANT (Groq):
+- Voice command understanding ke liye .env me GROQ_API_KEY set karo
+  (model: GROQ_MODEL=llama-3.1-8b-instant).
+- Agar key nahi di to bhi kaam karega (keyword fallback mode me).
+- Key ko sirf .env me rakho, .env.example me kabhi mat dalo (woh git me
+  tracked hai - real key commit ho jayegi).
+
+--------------------------------------------------------
+STEP 1 - DATABASE
+--------------------------------------------------------
+PostgreSQL start karo (Windows service ya Docker).
+Database "storyza" create karo (agar nahi hai):
+  createdb -U postgres storyza   (ya pgAdmin se)
+
+--------------------------------------------------------
+STEP 2 - BACKEND (FastAPI + Uvicorn)
+--------------------------------------------------------
+Ek terminal kholo:
+
+  cd D:\DemoProjects\storyza\backend
+
+Dependencies install (pehli baar ya jab requirements badle):
+
+  uv sync
+
+Seed assets generate karo (pehli baar zaroori, SVG assets banata hai):
+
+  uv run python -m storyza_backend.scripts.seed
+
+Database migrations chalao (tables banane ke liye):
+
+  uv run alembic upgrade head
+
+Server start karo:
+
+  uv run uvicorn storyza_backend.main:app --reload --host 0.0.0.0 --port 8000
+
+Backend ab chal raha hai:
+  - Main URL   : http://localhost:8000
+  - API docs   : http://localhost:8000/docs
+
+Agar "uv" install nahi hai:
+  - Windows: pip install uv
+  - phir upar wale uv commands chalao
+
+--------------------------------------------------------
+STEP 3 - FRONTEND (React + Vite)
+--------------------------------------------------------
+Dusra terminal kholo (backend ko chalta hua chhodo):
+
+  cd D:\DemoProjects\storyza\frontend
+
+Dependencies install (pehli baar ya jab package.json badle):
+
+  npm install
+
+Dev server start karo:
+
+  npm run dev
+
+Frontend ab chal raha hai:
+  - URL : http://localhost:5173
+
+Frontend ka dev server /api ko automatically
+http://localhost:8000 par proxy kar deta hai, isliye
+dono terminals ek saath chalne chahiye.
+
+--------------------------------------------------------
+EASIEST WAY - DONO EK COMMAND SE (recommended)
+--------------------------------------------------------
+Root folder me ek npm script banaya gaya hai.
+Ek terminal kholo:
+
+  cd D:\DemoProjects\storyza
+  npm install        (pehli baar hi chahiye - "concurrently" install karta hai)
+
+  npm run dev
+
+Ye dono app ek saath chala deta hai:
+  - Backend  : http://localhost:8000  (docs: /docs)
+  - Frontend : http://localhost:5173
+
+Ctrl+C dabane se dono ek saath band ho jayenge.
+
+Dusre root scripts:
+  npm run build    -> frontend production build
+  npm run test     -> backend pytest
+  npm run lint     -> frontend + backend lint
+
+--------------------------------------------------------
+SHORTCUT (dono ek saath, manually 2 terminals)
+--------------------------------------------------------
+2 terminals kholo:
+
+  Terminal 1 (backend):
+    cd D:\DemoProjects\storyza\backend
+    uv run uvicorn storyza_backend.main:app --reload --port 8000
+
+  Terminal 2 (frontend):
+    cd D:\DemoProjects\storyza\frontend
+    npm run dev
+
+Phir browser me kholo: http://localhost:5173
+
+--------------------------------------------------------
+BAAR BAAR PE KUCH CHEEZEIN SKIP
+--------------------------------------------------------
+- Dependencies pahle se install hain to "uv sync" / "npm install"
+  baar baar karne ki zaroorat nahi.
+- Migrations aur seed sirf pehli baar (ya jab schema badle) chahiye.
+- Baar baar sirf ye do commands kafi hain:
+    uv run uvicorn storyza_backend.main:app --reload --port 8000   (backend)
+    npm run dev                                                    (frontend)
+
+--------------------------------------------------------
+TESTS / CHECKS (optional)
+--------------------------------------------------------
+Backend tests:        cd backend && uv run pytest -q
+Backend lint:         cd backend && uv run ruff check src tests
+Backend typecheck:    cd backend && uv run mypy src
+Frontend build:       cd frontend && npm run build
+Frontend lint:        cd frontend && npm run lint

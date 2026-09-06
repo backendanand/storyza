@@ -22,6 +22,7 @@ import { useAuthStore } from '../../stores/auth'
 import { AssetPalette, type AssetItem } from './AssetPalette'
 import { StudioCanvas } from './StudioCanvas'
 import { Timeline } from './Timeline'
+import { VoiceAssistant } from './VoiceAssistant'
 import { registerSaveHandler, selectObject, useStudioStore } from './studioStore'
 import { fromProjectDocument, toProjectDocument, type ProjectDocument, type StudioObject } from './types'
 
@@ -258,8 +259,9 @@ export function StudioPage() {
         {paletteOpen && <AssetPalette />}
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="min-h-0 flex-1">
+          <div className="relative min-h-0 flex-1">
             <StudioCanvas />
+            <VoiceAssistant />
           </div>
           {timelineOpen && (
             <Timeline onClose={() => setTimelineOpen(false)} />

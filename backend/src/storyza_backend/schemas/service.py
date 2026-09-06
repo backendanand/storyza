@@ -36,3 +36,21 @@ class AiAssistResponse(BaseModel):
     feature: str
     suggestions: list[str] = Field(default_factory=list)
     message: str | None = None
+
+
+class VoiceAssetRef(BaseModel):
+    id: str
+    kind: str
+    name: str
+
+
+class VoiceCommandRequest(BaseModel):
+    transcript: str = Field(min_length=1, max_length=500)
+    assets: list[VoiceAssetRef] = Field(default_factory=list)
+
+
+class VoiceCommandResponse(BaseModel):
+    action: str
+    asset: VoiceAssetRef | None = None
+    direction: str | None = None
+    provider: str

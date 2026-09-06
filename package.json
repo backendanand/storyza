@@ -1,0 +1,17 @@
+{
+  "name": "storyza",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c blue,green \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "cd backend && .venv\\Scripts\\uvicorn.exe storyza_backend.main:app --reload --port 8000",
+    "setup:backend": "cd backend && .venv\\Scripts\\python.exe -m storyza_backend.scripts.seed && .venv\\Scripts\\alembic.exe upgrade head",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "test": "cd backend && uv run pytest -q",
+    "lint": "cd frontend && npm run lint && cd ../backend && uv run ruff check src tests"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
