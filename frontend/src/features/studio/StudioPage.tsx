@@ -20,9 +20,9 @@ import { apiClient } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../stores/auth'
 import { AssetPalette, type AssetItem } from './AssetPalette'
+import { ChatAssistant } from './ChatAssistant'
 import { StudioCanvas } from './StudioCanvas'
 import { Timeline } from './Timeline'
-import { VoiceAssistant } from './VoiceAssistant'
 import { registerSaveHandler, selectObject, useStudioStore } from './studioStore'
 import { fromProjectDocument, toProjectDocument, type ProjectDocument, type StudioObject } from './types'
 
@@ -74,12 +74,14 @@ export function StudioPage() {
 
   const [timelineOpen, setTimelineOpen] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(true)
+  const [rightTab, setRightTab] = useState<'tools' | 'chat'>('tools')
   const dirtyRef = useRef(false)
   const savingRef = useRef(false)
   const pendingRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastLoadRef = useRef(0)
   const requestedRef = useRef<string | null>(null)
+  const autoResumedRef = useRef(false)
 
   const { data: projects } = useQuery({
     queryKey: ['projects'],
@@ -236,6 +238,20 @@ export function StudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, projects, assets])
 
+  // Auto-resume: reopen the most recently edited project so a child starts right
+  // where they left off (unless a specific project was requested or reset).
+  useEffect(() => {
+    if (!user || !projects || !assets) return
+    if (searchParams.get('project')) return
+    if (autoResumedRef.current) return
+    autoResumedRef.current = true
+    const existing = useStudioStore.getState().projectId
+    if (existing) return
+    const latest = projects.items[0]
+    if (latest) void reloadProject(latest.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, projects, assets, searchParams])
+
   useEffect(() => {
     setHasVersions(!!projectId && !!versions && versions.length > 1)
   }, [projectId, versions, setHasVersions])
@@ -261,16 +277,51 @@ export function StudioPage() {
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="relative min-h-0 flex-1">
             <StudioCanvas />
-            <VoiceAssistant />
           </div>
           {timelineOpen && (
             <Timeline onClose={() => setTimelineOpen(false)} />
           )}
         </div>
 
-        {/* toolbar dock */}
-        <div className="flex w-56 shrink-0 min-h-0 flex-col gap-1.5 overflow-y-auto rounded-3xl border-2 border-white bg-white p-2.5 shadow-soft">
-          <Button
+        {/* toolbar dock (tabbed: Tools | Chat) */}
+        <div
+          className={cn(
+            'flex min-h-0 shrink-0 flex-col gap-1.5 rounded-3xl border-2 border-white bg-white p-2.5 shadow-soft transition-all',
+            rightTab === 'chat' ? 'w-80 overflow-hidden' : 'w-56 overflow-y-auto',
+          )}
+        >
+          <div className="grid shrink-0 grid-cols-2 gap-1.5">
+            <button
+              onClick={() => setRightTab('tools')}
+              className={cn(
+                'flex h-9 items-center justify-center gap-1 rounded-2xl text-[11px] font-bold transition-colors',
+                rightTab === 'tools'
+                  ? 'bg-brand-600 text-white shadow-lift'
+                  : 'bg-slate-50 text-slate-500 hover:bg-brand-50 hover:text-brand-700',
+              )}
+            >
+              🛠️ Tools
+            </button>
+            <button
+              onClick={() => setRightTab('chat')}
+              className={cn(
+                'flex h-9 items-center justify-center gap-1 rounded-2xl text-[11px] font-bold transition-colors',
+                rightTab === 'chat'
+                  ? 'bg-brand-600 text-white shadow-lift'
+                  : 'bg-slate-50 text-slate-500 hover:bg-brand-50 hover:text-brand-700',
+              )}
+            >
+              💬 Chat
+            </button>
+          </div>
+
+          <div className="my-0.5 h-px shrink-0 bg-slate-100" />
+
+          {rightTab === 'chat' ? (
+            <ChatAssistant />
+          ) : (
+            <>
+              <Button
             variant={isPlaying ? 'secondary' : 'sunny'}
             onClick={togglePlay}
             className="h-12 w-full"
@@ -371,6 +422,8 @@ export function StudioPage() {
           >
             🧸 Stickers
           </Button>
+            </>
+          )}
         </div>
       </div>
 

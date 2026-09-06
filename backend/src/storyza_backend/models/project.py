@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,3 +53,22 @@ class ProjectVersion(UUIDMixin, TimestampMixin, Base):
     project: Mapped["Project"] = relationship(
         back_populates="versions", foreign_keys=[project_id]
     )
+
+
+class ChatMessage(UUIDMixin, TimestampMixin, Base):
+    """A saved turn in a project's conversation with the AI assistant.
+
+    Persisted so chats survive refreshes, the AI can read earlier context
+    (FR-AI-005), and a returning child resumes exactly where they left off.
+    """
+
+    __tablename__ = "chat_messages"
+
+    project_id: Mapped[object] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[object] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
