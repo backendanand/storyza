@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Clapperboard, Loader2, Play, Save, SlidersHorizontal, Sparkles, Square } from 'lucide-react'
+import { Loader2, Play, Save, SlidersHorizontal, Sparkles, Square } from 'lucide-react'
 
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -9,6 +9,7 @@ import { Modal } from '../../components/ui/modal'
 import { apiClient } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../stores/auth'
+import { Animator } from './Animator'
 import { AssetPalette, type AssetItem } from './AssetPalette'
 import { CanvasArea } from './CanvasArea'
 import { ChatAssistant } from './ChatAssistant'
@@ -371,6 +372,8 @@ export function StudioPage() {
                     Select an object to edit it. ✨
                   </p>
                 )}
+
+                <Animator />
               </div>
             )}
           </div>
