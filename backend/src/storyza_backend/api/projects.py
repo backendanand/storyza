@@ -16,7 +16,6 @@ from storyza_backend.schemas.project import (
     ProjectDetail,
     ProjectDocument,
     ProjectRead,
-    ProjectRestore,
     ProjectVersionRead,
 )
 
@@ -122,25 +121,27 @@ async def save_project(
 
     payload = document.model_dump(mode="json")
     payload["schema_version"] = project.schema_version
-    max_version = (
-        await db.execute(
-            select(func.max(ProjectVersion.version)).where(
-                ProjectVersion.project_id == project.id
-            )
-        )
-    ).scalar()
-    next_version = (max_version or 0) + 1
 
-    version = ProjectVersion(
-        project_id=project.id,
-        version=next_version,
-        document=payload,
-        renderer_version=document.renderer_version,
-        checksum=_checksum(payload),
-    )
-    db.add(version)
-    await db.flush()
-    project.current_version_id = version.id
+    # Only one version per project — saving overwrites the current document.
+    version = None
+    if project.current_version_id:
+        version = await db.get(ProjectVersion, project.current_version_id)
+    if version is None:
+        version = ProjectVersion(
+            project_id=project.id,
+            version=1,
+            document=payload,
+            renderer_version=document.renderer_version,
+            checksum=_checksum(payload),
+        )
+        db.add(version)
+        await db.flush()
+        project.current_version_id = version.id
+    else:
+        version.document = payload
+        version.renderer_version = document.renderer_version
+        version.checksum = _checksum(payload)
+
     project.scene_count = len(document.scenes)
     await db.commit()
     await db.refresh(project)
@@ -174,52 +175,6 @@ async def list_project_versions(
         .order_by(ProjectVersion.version.desc())
     )
     return list(result.scalars().all())
-
-
-@router.post("/{project_id}/restore", response_model=ProjectRead)
-async def restore_project_version(
-    project_id: str,
-    payload: ProjectRestore,
-    user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> Project:
-    project = await _get_owned_project(db, user.id, project_id)
-    if project.status == ProjectStatus.LOCKED.value:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Project is locked")
-
-    version_result = await db.execute(
-        select(ProjectVersion).where(
-            ProjectVersion.project_id == project.id,
-            ProjectVersion.version == payload.version,
-        )
-    )
-    source = version_result.scalar_one_or_none()
-    if source is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
-
-    max_version = (
-        await db.execute(
-            select(func.max(ProjectVersion.version)).where(
-                ProjectVersion.project_id == project.id
-            )
-        )
-    ).scalar()
-    next_version = (max_version or 0) + 1
-    restored = ProjectVersion(
-        project_id=project.id,
-        version=next_version,
-        document=source.document,
-        renderer_version=source.renderer_version,
-        checksum=source.checksum,
-    )
-    db.add(restored)
-    await db.flush()
-    project.current_version_id = restored.id
-    project.schema_version = source.document.get("schema_version", project.schema_version)
-    project.scene_count = len(source.document.get("scenes", []))
-    await db.commit()
-    await db.refresh(project)
-    return project
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

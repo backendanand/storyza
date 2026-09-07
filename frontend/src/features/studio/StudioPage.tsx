@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Play, Save, SlidersHorizontal, Sparkles, Square } from 'lucide-react'
 
 import { Button } from '../../components/ui/button'
@@ -28,13 +28,6 @@ interface ProjectDetail extends ProjectRead {
   document: ProjectDocument | null
 }
 
-interface ProjectVersion {
-  id: string
-  version: number
-  renderer_version: string
-  created_at: string | null
-}
-
 export function StudioPage() {
   const user = useAuthStore((s) => s.user)
   const queryClient = useQueryClient()
@@ -53,11 +46,8 @@ export function StudioPage() {
   const scene = useStudioStore((s) => s.scene)
   const selectedId = useStudioStore((s) => s.selectedId)
   const playheadTime = useStudioStore((s) => s.playheadTime)
-  const setHasVersions = useStudioStore((s) => s.setHasVersions)
   const projectsModalOpen = useStudioStore((s) => s.projectsModalOpen)
   const setProjectsModalOpen = useStudioStore((s) => s.setProjectsModalOpen)
-  const versionsModalOpen = useStudioStore((s) => s.versionsModalOpen)
-  const setVersionsModalOpen = useStudioStore((s) => s.setVersionsModalOpen)
 
   const [timelineOpen, setTimelineOpen] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(true)
@@ -80,12 +70,6 @@ export function StudioPage() {
     queryKey: ['assets'],
     queryFn: () => apiClient.get<{ items: AssetItem[] }>('/assets?page_size=100'),
     staleTime: 5 * 60_000,
-  })
-
-  const { data: versions, refetch: refetchVersions } = useQuery({
-    queryKey: ['projects', projectId, 'versions'],
-    queryFn: () => apiClient.get<ProjectVersion[]>(`/projects/${projectId}/versions`),
-    enabled: !!user && !!projectId,
   })
 
   const performSave = useCallback(async () => {
@@ -119,7 +103,6 @@ export function StudioPage() {
       dirtyRef.current = false
       setSaveState('saved')
       void queryClient.invalidateQueries({ queryKey: ['projects'] })
-      void queryClient.invalidateQueries({ queryKey: ['projects', s.projectId, 'versions'] })
     } catch (error) {
       dirtyRef.current = true
       setSaveState('error')
@@ -182,17 +165,6 @@ export function StudioPage() {
     return () => registerSaveHandler(null)
   }, [saveNow])
 
-  const restoreMutation = useMutation({
-    mutationFn: async (version: number) => {
-      if (!projectId) return
-      await apiClient.post<ProjectRead>(`/projects/${projectId}/restore`, { version })
-    },
-    onSuccess: () => {
-      if (projectId) void reloadProject(projectId)
-      void refetchVersions()
-    },
-  })
-
   const reloadProject = async (id: string) => {
     const detail = await apiClient.get<ProjectDetail>(`/projects/${id}`)
     if (!detail.document) return
@@ -247,10 +219,6 @@ export function StudioPage() {
     if (latest) void reloadProject(latest.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, projects, assets, searchParams])
-
-  useEffect(() => {
-    setHasVersions(!!projectId && !!versions && versions.length > 1)
-  }, [projectId, versions, setHasVersions])
 
   const selected = selectObject(scene, selectedId)
 
@@ -422,52 +390,6 @@ export function StudioPage() {
         ) : (
           <p className="py-6 text-center text-sm font-semibold text-slate-400">
             No projects yet — hit Save to make your first one! ✨
-          </p>
-        )}
-      </Modal>
-
-      {/* Version history modal */}
-      <Modal open={versionsModalOpen} onClose={() => setVersionsModalOpen(false)} title="Version history 🕘">
-        {versions && versions.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {versions.map((version) => (
-              <div
-                key={version.id}
-                className={cn(
-                  'flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3',
-                  version.version === versions[0].version ? 'border-mint-200 bg-mint-50' : 'border-slate-100 bg-white',
-                )}
-              >
-                <span className="font-display text-sm text-slate-800">
-                  Version {version.version}
-                  {version.version === versions[0].version && (
-                    <Badge variant="success" className="ml-2">
-                      Current ✓
-                    </Badge>
-                  )}
-                </span>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400">{version.created_at ?? ''}</span>
-                  {version.version !== versions[0].version && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        restoreMutation.mutate(version.version)
-                        setVersionsModalOpen(false)
-                      }}
-                      disabled={restoreMutation.isPending}
-                    >
-                      Restore
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="py-6 text-center text-sm font-semibold text-slate-400">
-            No versions yet — save your project to create a history. ✨
           </p>
         )}
       </Modal>

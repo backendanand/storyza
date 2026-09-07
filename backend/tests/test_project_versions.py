@@ -65,7 +65,7 @@ def test_project_round_trip_with_tracks(client: TestClient) -> None:
     assert doc["scenes"][0]["objects"][0]["asset_id"] is None
 
 
-def test_version_list_and_restore(client: TestClient) -> None:
+def test_save_overwrites_single_version(client: TestClient) -> None:
     headers = _auth_headers(client)
     created = client.post(
         "/api/v1/projects", json={"title": "V", "document": _doc("V")}, headers=headers
@@ -73,31 +73,21 @@ def test_version_list_and_restore(client: TestClient) -> None:
     project_id = created.json()["id"]
 
     v2_doc = _doc("V2")
-    client.post(f"/api/v1/projects/{project_id}/save", json=v2_doc, headers=headers)
+    save = client.post(f"/api/v1/projects/{project_id}/save", json=v2_doc, headers=headers)
+    assert save.status_code == 200
 
     versions = client.get(f"/api/v1/projects/{project_id}/versions", headers=headers)
     assert versions.status_code == 200
     items = versions.json()
-    assert [v["version"] for v in items] == [2, 1]
-
-    restore = client.post(
-        f"/api/v1/projects/{project_id}/restore", json={"version": 1}, headers=headers
-    )
-    assert restore.status_code == 200
+    assert [v["version"] for v in items] == [1]
 
     detail = client.get(f"/api/v1/projects/{project_id}", headers=headers).json()
-    assert detail["document"]["title"] == "V"
+    assert detail["document"]["title"] == "V2"
 
-    after = client.get(f"/api/v1/projects/{project_id}/versions", headers=headers).json()
-    assert [v["version"] for v in after] == [3, 2, 1]
-
-
-def test_restore_missing_version_404(client: TestClient) -> None:
-    headers = _auth_headers(client)
-    created = client.post(
-        "/api/v1/projects", json={"title": "V", "document": _doc("V")}, headers=headers
-    )
-    response = client.post(
-        f"/api/v1/projects/{created.json()['id']}/restore", json={"version": 99}, headers=headers
-    )
-    assert response.status_code == 404
+    # A second save keeps a single version but updates the document.
+    v3_doc = _doc("V3")
+    client.post(f"/api/v1/projects/{project_id}/save", json=v3_doc, headers=headers)
+    versions = client.get(f"/api/v1/projects/{project_id}/versions", headers=headers).json()
+    assert [v["version"] for v in versions] == [1]
+    detail = client.get(f"/api/v1/projects/{project_id}", headers=headers).json()
+    assert detail["document"]["title"] == "V3"

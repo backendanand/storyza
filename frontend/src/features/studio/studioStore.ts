@@ -86,15 +86,11 @@ interface StudioState {
   saveState: SaveState
   saveError: string | null
   projectsModalOpen: boolean
-  versionsModalOpen: boolean
-  hasVersions: boolean
 
   setTitle: (title: string) => void
   setProjectId: (projectId: string | null) => void
   setDuration: (duration: number) => void
   setProjectsModalOpen: (open: boolean) => void
-  setVersionsModalOpen: (open: boolean) => void
-  setHasVersions: (hasVersions: boolean) => void
   setSaveState: (state: SaveState) => void
   setSaveError: (error: string | null) => void
   setScene: (scene: StudioScene, projectId?: string | null) => void
@@ -195,8 +191,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   saveState: 'idle',
   saveError: null,
   projectsModalOpen: false,
-  versionsModalOpen: false,
-  hasVersions: false,
 
   setTitle: (title) => set({ title }),
 
@@ -205,8 +199,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setDuration: (duration) => set({ duration: Math.min(120, Math.max(1, Math.round(duration))) }),
 
   setProjectsModalOpen: (open) => set({ projectsModalOpen: open }),
-  setVersionsModalOpen: (open) => set({ versionsModalOpen: open }),
-  setHasVersions: (hasVersions) => set({ hasVersions }),
 
   setSaveState: (saveState) => set({ saveState }),
   setSaveError: (saveError) => set({ saveError }),
@@ -626,8 +618,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       saveState: 'idle',
       saveError: null,
       projectsModalOpen: false,
-      versionsModalOpen: false,
-      hasVersions: false,
     }),
 }))
 

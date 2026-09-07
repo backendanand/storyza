@@ -1,11 +1,9 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { FolderOpen, History } from 'lucide-react'
 
 import { useAuthStore } from '../../stores/auth'
 import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
-import { useStudioStore } from '../../features/studio/studioStore'
 
 const navItem = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -32,10 +30,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
   const inStudio = location.pathname.startsWith('/studio')
 
-  const hasVersions = useStudioStore((s) => s.hasVersions)
-  const setProjectsModalOpen = useStudioStore((s) => s.setProjectsModalOpen)
-  const setVersionsModalOpen = useStudioStore((s) => s.setVersionsModalOpen)
-
   return (
     <div className="flex h-dvh flex-col">
       <header className="shrink-0 border-b border-border-subtle bg-white/90 backdrop-blur">
@@ -46,22 +40,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               Storyza
             </span>
           </Link>
-
-          {inStudio && (
-            <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-4">
-              <Button variant="outline" size="sm" onClick={() => setProjectsModalOpen(true)}>
-                <FolderOpen className="h-4 w-4" /> My projects
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setVersionsModalOpen(true)}
-                disabled={!hasVersions}
-              >
-                <History className="h-4 w-4" /> Versions
-              </Button>
-            </div>
-          )}
 
           <div className="ml-auto flex items-center gap-3">
             <nav className="flex items-center gap-1">
@@ -80,7 +58,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             {user ? (
               <>
-                <span className="flex items-center gap-2 rounded-full border border-border-subtle bg-white py-1.5 pr-3 pl-1.5 text-sm font-bold text-ink-muted">
+                <Link
+                  to="/account"
+                  className="flex items-center gap-2 rounded-full border border-border-subtle bg-white py-1.5 pr-3 pl-1.5 text-sm font-bold text-ink-muted transition-colors hover:border-brand-200 hover:bg-brand-50"
+                  title="My account"
+                >
                   <span
                     aria-hidden
                     className="flex h-7 w-7 items-center justify-center rounded-full bg-sunny-300 text-[11px] text-sunny-900"
@@ -88,7 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {initials(user.full_name)}
                   </span>
                   <span className="hidden sm:inline">{user.full_name}</span>
-                </span>
+                </Link>
                 <Button variant="ghost" size="sm" onClick={logout} className="text-xs">
                   Log out
                 </Button>
