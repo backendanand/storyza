@@ -12,7 +12,7 @@ const navItem = ({ isActive }: { isActive: boolean }) =>
     'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200',
     isActive
       ? 'bg-brand-600 text-white shadow-lift'
-      : 'text-slate-600 hover:bg-brand-50 hover:text-brand-800',
+      : 'text-ink-muted hover:bg-brand-50 hover:text-brand-800',
   )
 
 function initials(name: string | null | undefined): string {
@@ -38,7 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-dvh flex-col">
-      <header className="shrink-0 border-b border-slate-100 bg-cream/90">
+      <header className="shrink-0 border-b border-border-subtle bg-white/90 backdrop-blur">
         <div className="flex h-16 items-center gap-3 px-4">
           <Link to="/" className="flex shrink-0 items-center gap-2">
             <img src="/logo.png" alt="Storyza" className="h-9 w-9 rounded-xl" />
@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             {user ? (
               <>
-                <span className="flex items-center gap-2 rounded-full border-2 border-slate-100 bg-white py-1.5 pr-3 pl-1.5 text-sm font-bold text-slate-700">
+                <span className="flex items-center gap-2 rounded-full border border-border-subtle bg-white py-1.5 pr-3 pl-1.5 text-sm font-bold text-ink-muted">
                   <span
                     aria-hidden
                     className="flex h-7 w-7 items-center justify-center rounded-full bg-sunny-300 text-[11px] text-sunny-900"
@@ -94,14 +94,28 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Button>
               </>
             ) : (
-              <Link to="/login">
-                <Button size="sm">Sign in</Button>
-              </Link>
+              <>
+                <Link to="/register">
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    Create account
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button size="sm">Sign in</Button>
+                </Link>
+              </>
             )}
           </div>
         </div>
       </header>
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</main>
+      <main
+        className={cn(
+          'flex-1 overflow-hidden',
+          inStudio ? 'flex min-h-0 p-3' : 'min-h-0 overflow-y-auto px-4 py-3',
+        )}
+      >
+        {children}
+      </main>
     </div>
   )
 }

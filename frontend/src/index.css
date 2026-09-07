@@ -4,41 +4,55 @@
   --font-sans: 'Nunito', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Fredoka', 'Nunito', ui-sans-serif, system-ui, sans-serif;
 
-  --color-brand-50: #eff8ff;
-  --color-brand-100: #daefff;
-  --color-brand-200: #bde4ff;
-  --color-brand-300: #90d4ff;
-  --color-brand-400: #5cbbff;
-  --color-brand-500: #369bff;
-  --color-brand-600: #207af5;
-  --color-brand-700: #1862e1;
-  --color-brand-800: #1a4fb6;
-  --color-brand-900: #1b458f;
+  /* Single vibrant accent used ONLY for primary CTAs & selection. */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
 
-  --color-sunny-50: #fffbea;
-  --color-sunny-100: #fff3c4;
-  --color-sunny-200: #ffe488;
-  --color-sunny-300: #ffd24b;
-  --color-sunny-400: #ffc31c;
-  --color-sunny-500: #f0a800;
-  --color-sunny-600: #cf8500;
-  --color-sunny-700: #a56200;
-  --color-sunny-800: #884d04;
-  --color-sunny-900: #733f09;
+  /* Unified neutral surface scale (zinc/slate) for the app background. */
+  --color-surface: #f4f5f7;
+  --color-surface-strong: #eceef1;
+  --color-border-subtle: #e4e7eb;
+  --color-ink: #18181b;
+  --color-ink-muted: #52525b;
+  --color-ink-faint: #a1a1aa;
+
+  /*
+   * Legacy semantic colors kept as aliases so existing screens keep working.
+   * They are tuned toward a soft, muted palette that harmonizes with the
+   * neutral base; only `brand` is used as the primary CTA accent.
+   */
+  --color-sunny-50: #fffbeb;
+  --color-sunny-100: #fef3c7;
+  --color-sunny-200: #fde68a;
+  --color-sunny-300: #fcd34d;
+  --color-sunny-400: #fbbf24;
+  --color-sunny-500: #f59e0b;
+  --color-sunny-600: #d97706;
+  --color-sunny-700: #b45309;
+  --color-sunny-800: #92400e;
+  --color-sunny-900: #78350f;
 
   --color-coral-50: #fff1f2;
-  --color-coral-100: #ffe0e4;
-  --color-coral-200: #ffc7ce;
-  --color-coral-300: #ff9fad;
-  --color-coral-400: #ff6b81;
-  --color-coral-500: #f93f5f;
+  --color-coral-100: #ffe4e6;
+  --color-coral-200: #fecdd3;
+  --color-coral-300: #fda4af;
+  --color-coral-400: #fb7185;
+  --color-coral-500: #f43f5e;
   --color-coral-600: #e11d48;
-  --color-coral-700: #bd1440;
-  --color-coral-800: #9e143d;
-  --color-coral-900: #881439;
+  --color-coral-700: #be123c;
+  --color-coral-800: #9f1239;
+  --color-coral-900: #881337;
 
-  --color-mint-50: #f0fdf5;
-  --color-mint-100: #dcfce8;
+  --color-mint-50: #f0fdf4;
+  --color-mint-100: #dcfce7;
   --color-mint-200: #bbf7d0;
   --color-mint-300: #86efac;
   --color-mint-400: #4ade80;
@@ -59,12 +73,14 @@
   --color-grape-800: #5b21b6;
   --color-grape-900: #4c1d95;
 
-  --color-cream: #fff8ee;
+  --color-cream: #fafafa;
 
-  --shadow-soft: 0 10px 30px -12px rgb(15 23 42 / 0.18);
-  --shadow-lift: 0 14px 34px -12px rgb(32 122 245 / 0.55);
-  --shadow-candy: 0 14px 34px -12px rgb(255 107 129 / 0.5);
-  --shadow-sunny: 0 14px 34px -12px rgb(240 168 0 / 0.55);
+  /* Soft, rounded shadows. */
+  --shadow-soft: 0 8px 24px -10px rgb(24 24 27 / 0.14);
+  --shadow-lift: 0 12px 28px -10px rgb(37 99 235 / 0.45);
+  --shadow-float: 0 6px 20px -8px rgb(24 24 27 / 0.28);
+  --shadow-candy: 0 14px 34px -12px rgb(244 63 94 / 0.5);
+  --shadow-sunny: 0 14px 34px -12px rgb(245 158 11 / 0.5);
 }
 
 @layer base {
@@ -76,11 +92,7 @@
     margin: 0;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    background-color: #fff8ee;
-    background-image:
-      radial-gradient(40rem 24rem at 120% -10%, rgb(90 187 255 / 0.16), transparent 60%),
-      radial-gradient(36rem 22rem at -10% 110%, rgb(255 195 28 / 0.14), transparent 60%);
-    background-attachment: fixed;
+    background-color: var(--color-surface);
   }
 
   button {
@@ -95,6 +107,29 @@
     background-color: var(--color-brand-200);
   }
 
+  /* Crisp, thin custom scrollbars for panels & the timeline. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-faint) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-ink-faint);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-ink-muted);
+  }
+
+  /* Canvas host: fills its 16:9 stage and centers the Pixi renderer. */
   .studio-canvas-mount {
     display: flex;
     align-items: center;

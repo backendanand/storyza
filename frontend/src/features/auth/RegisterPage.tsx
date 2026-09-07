@@ -7,12 +7,14 @@ import { Card, CardContent } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { useAuthStore } from '../../stores/auth'
 
-export function LoginPage() {
+export function RegisterPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const login = useAuthStore((s) => s.login)
+  const register = useAuthStore((s) => s.register)
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -22,12 +24,16 @@ export function LoginPage() {
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    if (password !== confirm) {
+      setError("Passwords don't match")
+      return
+    }
     setSubmitting(true)
     try {
-      await login(email, password)
+      await register({ email, full_name: fullName, password })
       navigate(redirectTo)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed')
+      setError(err instanceof Error ? err.message : 'Sign up failed')
     } finally {
       setSubmitting(false)
     }
@@ -36,10 +42,10 @@ export function LoginPage() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-5">
       <div className="flex flex-col items-center gap-2 text-center">
-        <Mascot variant="wink" size={110} />
-        <h1 className="font-display text-3xl text-slate-900">Welcome back!</h1>
+        <Mascot variant="happy" size={110} />
+        <h1 className="font-display text-3xl text-slate-900">Create your account!</h1>
         <p className="text-sm font-semibold text-slate-500">
-          Sign in and let's keep making awesome animations 🎬
+          Make, save and share awesome animations 🎬
         </p>
       </div>
 
@@ -47,13 +53,24 @@ export function LoginPage() {
         <CardContent className="p-6">
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-bold text-slate-700">Full name</span>
+              <Input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                autoComplete="name"
+                placeholder="e.g. Priya Sharma"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
               <span className="text-sm font-bold text-slate-700">Email</span>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
-                placeholder="you@school.edu"
+                placeholder="you@example.com"
                 required
               />
             </label>
@@ -63,9 +80,22 @@ export function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                placeholder="Your secret password"
+                autoComplete="new-password"
+                placeholder="At least 8 characters"
                 required
+                minLength={8}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-bold text-slate-700">Confirm password</span>
+              <Input
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                autoComplete="new-password"
+                placeholder="Repeat your password"
+                required
+                minLength={8}
               />
             </label>
             {error && (
@@ -74,20 +104,16 @@ export function LoginPage() {
               </p>
             )}
             <Button type="submit" size="lg" disabled={submitting} className="mt-1">
-              {submitting ? 'Signing in…' : 'Sign in 🚀'}
+              {submitting ? 'Creating account…' : 'Create account 🎉'}
             </Button>
           </form>
         </CardContent>
       </Card>
 
       <p className="text-sm font-semibold text-slate-500">
-        New here?{' '}
-        <Link
-          to="/register"
-          state={{ from: redirectTo !== '/' ? redirectTo : undefined }}
-          className="font-bold text-brand-700 underline underline-offset-2"
-        >
-          Create a free account
+        Already have an account?{' '}
+        <Link to="/login" className="font-bold text-brand-700 underline underline-offset-2">
+          Sign in
         </Link>
       </p>
     </div>

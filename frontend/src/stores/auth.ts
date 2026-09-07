@@ -24,6 +24,12 @@ interface AuthState {
   token: string | null
   user: User | null
   login: (email: string, password: string) => Promise<void>
+  register: (payload: {
+    email: string
+    full_name: string
+    password: string
+    role?: UserRole
+  }) => Promise<void>
   logout: () => void
   loadMe: () => Promise<void>
 }
@@ -40,6 +46,16 @@ export const useAuthStore = create<AuthState>()(
         set({ token: tokens.access_token })
         const user = await apiClient.get<User>('/auth/me')
         set({ user })
+      },
+
+      register: async (payload) => {
+        await apiClient.post<User>('/auth/register', {
+          email: payload.email,
+          full_name: payload.full_name,
+          password: payload.password,
+          role: payload.role ?? 'student',
+        })
+        await get().login(payload.email, payload.password)
       },
 
       logout: () => {

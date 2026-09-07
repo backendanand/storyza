@@ -359,10 +359,8 @@ export function StudioCanvas() {
   }, [previewAnimation, animations, scene])
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[2rem] border-2 border-white bg-gradient-to-b from-sky-100 to-brand-50 p-2.5 shadow-soft">
-        <div ref={mountRef} className="studio-canvas-mount" />
-      </div>
+    <div className="h-full w-full min-h-0">
+      <div ref={mountRef} className="studio-canvas-mount" />
     </div>
   )
 }

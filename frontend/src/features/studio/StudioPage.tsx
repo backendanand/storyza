@@ -1,17 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  Loader2,
-  Play,
-  RefreshCcw,
-  RotateCw,
-  Save,
-  Square,
-  Trash2,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react'
+import { Clapperboard, Loader2, Play, Save, SlidersHorizontal, Sparkles, Square } from 'lucide-react'
 
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -20,8 +10,8 @@ import { apiClient } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../stores/auth'
 import { AssetPalette, type AssetItem } from './AssetPalette'
+import { CanvasArea } from './CanvasArea'
 import { ChatAssistant } from './ChatAssistant'
-import { StudioCanvas } from './StudioCanvas'
 import { Timeline } from './Timeline'
 import { registerSaveHandler, selectObject, useStudioStore } from './studioStore'
 import { fromProjectDocument, toProjectDocument, type ProjectDocument, type StudioObject } from './types'
@@ -52,10 +42,6 @@ export function StudioPage() {
   const projectId = useStudioStore((s) => s.projectId)
   const isPlaying = useStudioStore((s) => s.isPlaying)
   const togglePlay = useStudioStore((s) => s.togglePlay)
-  const rotateSelected = useStudioStore((s) => s.rotateSelected)
-  const scaleSelected = useStudioStore((s) => s.scaleSelected)
-  const removeSelected = useStudioStore((s) => s.removeSelected)
-  const reset = useStudioStore((s) => s.reset)
   const loadDocument = useStudioStore((s) => s.loadDocument)
   const setSaveState = useStudioStore((s) => s.setSaveState)
   const setSaveError = useStudioStore((s) => s.setSaveError)
@@ -268,7 +254,7 @@ export function StudioPage() {
   const selected = selectObject(scene, selectedId)
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full max-h-full min-h-0 flex-1 flex-col overflow-hidden">
       {!user && (
         <p className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-sunny-100 px-4 py-2 text-xs font-semibold text-sunny-800">
           <span aria-hidden>👀</span> You're in preview mode.{' '}
@@ -279,161 +265,130 @@ export function StudioPage() {
         </p>
       )}
 
-      {/* editor: stickers left, canvas + timeline center, toolbar docked right */}
-      <div className="flex min-h-0 flex-1 gap-3">
+      {/* Three-column editor grid: left library | center canvas+timeline | right panel */}
+      <div className="flex min-h-0 flex-1 gap-2 overflow-hidden">
         {paletteOpen && <AssetPalette />}
 
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="relative min-h-0 flex-1">
-            <StudioCanvas />
-          </div>
-          {timelineOpen && (
-            <Timeline onClose={() => setTimelineOpen(false)} />
-          )}
+        <div className="flex h-full min-w-0 flex-1 flex-col justify-between gap-2 overflow-hidden">
+          <CanvasArea />
+          {timelineOpen && <Timeline />}
         </div>
 
-        {/* toolbar dock (tabbed: Tools | Chat) */}
-        <div
-          className={cn(
-            'flex min-h-0 shrink-0 flex-col gap-1.5 rounded-3xl border-2 border-white bg-white p-2.5 shadow-soft transition-all',
-            rightTab === 'chat' ? 'w-80 overflow-hidden' : 'w-56 overflow-y-auto',
-          )}
-        >
-          <div className="grid shrink-0 grid-cols-2 gap-1.5">
+        {/* Right sidebar: seamless Tools | Chat switcher + primary actions */}
+        <aside className="flex w-75 shrink-0 flex-col rounded-3xl border border-border-subtle bg-white p-2.5 shadow-soft">
+          {/* Tab switcher */}
+          <div className="relative grid shrink-0 grid-cols-2 rounded-2xl bg-surface p-1">
+            <span
+              aria-hidden
+              className={cn(
+                'absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-xl bg-white shadow-soft transition-transform duration-200',
+                rightTab === 'tools' ? 'translate-x-1' : 'translate-x-full',
+              )}
+            />
             <button
               onClick={() => setRightTab('tools')}
+              aria-pressed={rightTab === 'tools'}
               className={cn(
-                'flex h-9 items-center justify-center gap-1 rounded-2xl text-[11px] font-bold transition-colors',
-                rightTab === 'tools'
-                  ? 'bg-brand-600 text-white shadow-lift'
-                  : 'bg-slate-50 text-slate-500 hover:bg-brand-50 hover:text-brand-700',
+                'relative z-10 flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors',
+                rightTab === 'tools' ? 'text-brand-700' : 'text-ink-muted',
               )}
             >
-              🛠️ Tools
+              <SlidersHorizontal className="h-4 w-4" /> Tools
             </button>
             <button
               onClick={() => setRightTab('chat')}
+              aria-pressed={rightTab === 'chat'}
               className={cn(
-                'flex h-9 items-center justify-center gap-1 rounded-2xl text-[11px] font-bold transition-colors',
-                rightTab === 'chat'
-                  ? 'bg-brand-600 text-white shadow-lift'
-                  : 'bg-slate-50 text-slate-500 hover:bg-brand-50 hover:text-brand-700',
+                'relative z-10 flex h-9 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors',
+                rightTab === 'chat' ? 'text-brand-700' : 'text-ink-muted',
               )}
             >
-              💬 Chat
+              <Sparkles className="h-4 w-4" /> Chat
             </button>
           </div>
 
-          <div className="my-0.5 h-px shrink-0 bg-slate-100" />
+          {/* Panel body */}
+          <div className="scroll-thin mt-2 flex min-h-0 flex-1 flex-col">
+            {rightTab === 'chat' ? (
+              <ChatAssistant />
+            ) : (
+              <div className="flex h-full flex-col gap-3">
+                {/* Playback button - always visible */}
+                <Button
+                  variant={isPlaying ? 'secondary' : 'default'}
+                  onClick={togglePlay}
+                  className="h-11 w-full"
+                >
+                  {isPlaying ? <Square className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+                  {isPlaying ? 'Stop' : 'Play'}
+                </Button>
 
-          {rightTab === 'chat' ? (
-            <ChatAssistant />
-          ) : (
-            <>
-              <Button
-            variant={isPlaying ? 'secondary' : 'sunny'}
-            onClick={togglePlay}
-            className="h-12 w-full"
-          >
-            {isPlaying ? <Square className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
-            {isPlaying ? 'Stop' : 'Play'}
-          </Button>
+                {/* Quick toggles */}
+                <div className="flex gap-1.5">
+                  <Button
+                    variant={paletteOpen ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setPaletteOpen((open) => !open)}
+                    title="Show or hide the stickers"
+                  >
+                    🧸 Stickers
+                  </Button>
+                  <Button
+                    variant={timelineOpen ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setTimelineOpen((open) => !open)}
+                    title="Toggle timeline view"
+                  >
+                    ⏱️ Timeline
+                  </Button>
+                </div>
 
-          <div className="my-0.5 h-px shrink-0 bg-slate-100" />
+                {/* Project naming */}
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">Project name</span>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Name your project"
+                    className="h-10 w-full rounded-2xl border border-border-subtle bg-surface px-3 text-sm text-ink transition-colors focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none"
+                  />
+                </label>
 
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              onClick={() => rotateSelected(15)}
-              title="Turn selected object"
-              className="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-slate-100 text-[11px] font-bold text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50"
-            >
-              <RotateCw className="h-4 w-4 text-brand-600" /> Turn
-            </button>
-            <button
-              onClick={() => scaleSelected(1.15)}
-              title="Make selected object bigger"
-              className="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-slate-100 text-[11px] font-bold text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50"
-            >
-              <ZoomIn className="h-4 w-4 text-brand-600" /> Bigger
-            </button>
-            <button
-              onClick={() => scaleSelected(0.87)}
-              title="Make selected object smaller"
-              className="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-slate-100 text-[11px] font-bold text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50"
-            >
-              <ZoomOut className="h-4 w-4 text-brand-600" /> Smaller
-            </button>
-            <button
-              onClick={removeSelected}
-              title="Delete selected object"
-              className="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-slate-100 text-[11px] font-bold text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50"
-            >
-              <Trash2 className="h-4 w-4 text-brand-600" /> Delete
-            </button>
-            <button
-              onClick={reset}
-              title="Start over on this scene"
-              className="flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-slate-100 text-[11px] font-bold text-slate-700 transition-colors hover:border-brand-300 hover:bg-brand-50"
-            >
-              <RefreshCcw className="h-4 w-4 text-brand-600" /> Reset
-            </button>
+                {/* Selected object info */}
+                {selected ? (
+                  <div className="rounded-2xl bg-brand-50 px-3 py-2 text-[11px] font-semibold text-ink-muted">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">Selected</p>
+                    <p className="truncate font-display text-sm font-semibold text-ink">{selected.name}</p>
+                    <p className="mt-1">
+                      x {selected.x.toFixed(0)} · y {selected.y.toFixed(0)} · {selected.rotation}° · size{' '}
+                      {selected.scale.toFixed(2)} · {playheadTime.toFixed(1)}s
+                    </p>
+                  </div>
+                ) : (
+                  <p className="rounded-2xl bg-surface px-3 py-2 text-xs font-semibold text-ink-faint">
+                    Select an object to edit it. ✨
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="my-0.5 h-px shrink-0 bg-slate-100" />
-
-          {selected && (
-            <div className="rounded-2xl bg-brand-50 px-3 py-2 text-[11px] font-semibold text-slate-500">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-brand-600">Selected</p>
-              <p className="truncate font-display text-sm font-semibold text-slate-800">{selected.name}</p>
-              <p className="mt-1">
-                x {selected.x.toFixed(0)} · y {selected.y.toFixed(0)} · {selected.rotation}° · size{' '}
-                {selected.scale.toFixed(2)} · {playheadTime.toFixed(1)}s
-              </p>
-            </div>
-          )}
-
-          <div className="my-0.5 h-px shrink-0 bg-slate-100" />
-
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Name your project ✏️"
-            className="h-10 w-full rounded-2xl border-2 border-slate-100 bg-white px-3 font-display text-sm text-slate-900 transition-colors focus:border-brand-300 focus:ring-2 focus:ring-brand-100 focus:outline-none"
-          />
-          <Button size="sm" onClick={saveNow} disabled={saveState === 'saving'} className="w-full">
-            {saveState === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save
-          </Button>
-          {saveState === 'saved' && (
-            <p className="text-center text-[11px] font-bold text-mint-600">Saved ✓</p>
-          )}
-          {saveState === 'error' && saveError && (
-            <p className="text-center text-[11px] font-semibold text-coral-700">{saveError}</p>
-          )}
-
-          <div className="my-0.5 h-px shrink-0 bg-slate-100" />
-
-          <Button
-            variant={timelineOpen ? 'sunny' : 'outline'}
-            size="sm"
-            className="h-9 w-full"
-            onClick={() => setTimelineOpen((open) => !open)}
-            title="Show or hide the movie strip"
-          >
-            🎞️ Movie strip
-          </Button>
-          <Button
-            variant={paletteOpen ? 'sunny' : 'outline'}
-            size="sm"
-            className="h-9 w-full"
-            onClick={() => setPaletteOpen((open) => !open)}
-            title="Show or hide the stickers"
-          >
-            🧸 Stickers
-          </Button>
-            </>
-          )}
-        </div>
+          {/* Primary actions pinned to the bottom */}
+          <div className="mt-2 flex shrink-0 flex-col gap-1.5 border-t border-border-subtle pt-2">
+            <Button onClick={saveNow} disabled={saveState === 'saving'} className="w-full">
+              {saveState === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saveState === 'saving' ? 'Saving…' : 'Save'}
+            </Button>
+            {saveState === 'saved' && (
+              <p className="text-center text-[11px] font-bold text-mint-600">Saved ✓</p>
+            )}
+            {saveState === 'error' && saveError && (
+              <p className="text-center text-[11px] font-semibold text-coral-700">{saveError}</p>
+            )}
+          </div>
+        </aside>
       </div>
 
       {/* My projects modal */}
