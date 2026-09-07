@@ -105,12 +105,17 @@ class ProjectRead(BaseModel):
     schema_version: int
     scene_count: int
     current_version_id: uuid.UUID | None
+    category: str | None = None
+    theme: str | None = None
+    description: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
 
 class ProjectDetail(ProjectRead):
     document: ProjectDocument | None = None
+    author_name: str | None = None
+    author_role: str | None = None
 
 
 class ProjectRestore(BaseModel):

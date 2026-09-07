@@ -49,6 +49,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <NavLink to="/studio" className={navItem}>
                 <span aria-hidden>🎬</span> Studio
               </NavLink>
+              <NavLink to="/community" className={navItem}>
+                <span aria-hidden>🌍</span> Community
+              </NavLink>
               {user?.role === 'teacher' && (
                 <NavLink to="/teacher" className={navItem}>
                   <span aria-hidden>🧑‍🏫</span> Teacher

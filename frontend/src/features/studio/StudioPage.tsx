@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Play, Save, SlidersHorizontal, Sparkles, Square } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Loader2,
+  Play,
+  Rocket,
+  Save,
+  SlidersHorizontal,
+  Sparkles,
+  Square,
+  Undo2,
+} from 'lucide-react'
 
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -9,6 +18,7 @@ import { Modal } from '../../components/ui/modal'
 import { apiClient } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../stores/auth'
+import { STORY_CATEGORIES, STORY_THEMES } from '../community/constants'
 import { Animator } from './Animator'
 import { AssetPalette, type AssetItem } from './AssetPalette'
 import { CanvasArea } from './CanvasArea'
@@ -21,6 +31,9 @@ interface ProjectRead {
   id: string
   title: string
   status: string
+  category: string | null
+  theme: string | null
+  description: string | null
   updated_at: string | null
 }
 
@@ -52,6 +65,10 @@ export function StudioPage() {
   const [timelineOpen, setTimelineOpen] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(true)
   const [rightTab, setRightTab] = useState<'tools' | 'chat'>('tools')
+  const [publishModalOpen, setPublishModalOpen] = useState(false)
+  const [publishCategory, setPublishCategory] = useState('')
+  const [publishTheme, setPublishTheme] = useState('')
+  const [publishDescription, setPublishDescription] = useState('')
   const dirtyRef = useRef(false)
   const savingRef = useRef(false)
   const pendingRef = useRef(false)
@@ -71,6 +88,41 @@ export function StudioPage() {
     queryFn: () => apiClient.get<{ items: AssetItem[] }>('/assets?page_size=100'),
     staleTime: 5 * 60_000,
   })
+
+  const currentProject = projects?.items.find((p) => p.id === projectId)
+  const isPublished = currentProject?.status === 'PUBLISHED'
+
+  const publishMutation = useMutation({
+    mutationFn: async (payload: { description: string; category: string; theme: string }) => {
+      await performSave()
+      const id = useStudioStore.getState().projectId
+      if (!id) throw new Error('Project could not be saved')
+      return apiClient.post<ProjectRead>(`/projects/${id}/publish`, payload)
+    },
+    onSuccess: () => {
+      setPublishModalOpen(false)
+      setSaveState('saved')
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+
+  const unpublishMutation = useMutation({
+    mutationFn: async () => {
+      if (!projectId) throw new Error('No project to unpublish')
+      return apiClient.post<ProjectRead>(`/projects/${projectId}/unpublish`)
+    },
+    onSuccess: () => {
+      setSaveState('saved')
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+
+  const openPublishModal = () => {
+    setPublishCategory(currentProject?.category ?? '')
+    setPublishTheme(currentProject?.theme ?? '')
+    setPublishDescription(currentProject?.description ?? '')
+    setPublishModalOpen(true)
+  }
 
   const performSave = useCallback(async () => {
     if (savingRef.current) {
@@ -352,11 +404,37 @@ export function StudioPage() {
               {saveState === 'saving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {saveState === 'saving' ? 'Saving…' : 'Save'}
             </Button>
+            {isPublished ? (
+              <>
+                <Button variant="mint" onClick={() => unpublishMutation.mutate()} disabled={unpublishMutation.isPending} className="w-full">
+                  <Undo2 className="h-4 w-4" />
+                  {unpublishMutation.isPending ? 'Unpublishing…' : 'Published — unpublish'}
+                </Button>
+                <p className="text-center text-[11px] font-bold text-mint-600">
+                  🌍 Live on the community page!
+                </p>
+              </>
+            ) : (
+              <Button
+                variant="sunny"
+                onClick={openPublishModal}
+                disabled={publishMutation.isPending}
+                className="w-full"
+              >
+                <Rocket className="h-4 w-4" />
+                {publishMutation.isPending ? 'Publishing…' : 'Publish to community'}
+              </Button>
+            )}
             {saveState === 'saved' && (
               <p className="text-center text-[11px] font-bold text-mint-600">Saved ✓</p>
             )}
             {saveState === 'error' && saveError && (
               <p className="text-center text-[11px] font-semibold text-coral-700">{saveError}</p>
+            )}
+            {publishMutation.isError && (
+              <p className="text-center text-[11px] font-semibold text-coral-700">
+                {publishMutation.error instanceof Error ? publishMutation.error.message : 'Publish failed'}
+              </p>
             )}
           </div>
         </aside>
@@ -381,8 +459,8 @@ export function StudioPage() {
                 <span className="truncate font-display text-sm text-slate-800">
                   {project.title || 'Untitled animation'}
                 </span>
-                <Badge variant={project.status === 'published' ? 'success' : 'neutral'}>
-                  {project.status === 'published' ? 'Shared 🎉' : 'Draft ✏️'}
+                <Badge variant={project.status === 'PUBLISHED' ? 'success' : 'neutral'}>
+                  {project.status === 'PUBLISHED' ? 'Shared 🎉' : 'Draft ✏️'}
                 </Badge>
               </button>
             ))}
@@ -392,6 +470,84 @@ export function StudioPage() {
             No projects yet — hit Save to make your first one! ✨
           </p>
         )}
+      </Modal>
+
+      {/* Publish modal */}
+      <Modal open={publishModalOpen} onClose={() => setPublishModalOpen(false)} title="Publish to community 🚀">
+        <div className="flex flex-col gap-4">
+          <p className="text-sm font-semibold text-slate-500">
+            Your story will be visible to everyone on the community page. Add a few details to
+            help others discover it!
+          </p>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-slate-700">Category</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {STORY_CATEGORIES.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setPublishCategory(publishCategory === c.value ? '' : c.value)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-2xl border-2 px-3 py-2 text-left text-xs font-bold transition-colors',
+                    publishCategory === c.value
+                      ? 'border-brand-400 bg-brand-50 text-brand-800'
+                      : 'border-slate-100 bg-white text-slate-600 hover:border-brand-200',
+                  )}
+                >
+                  <span aria-hidden>{c.emoji}</span> {c.label}
+                </button>
+              ))}
+            </div>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-slate-700">Theme</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {STORY_THEMES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setPublishTheme(publishTheme === t.value ? '' : t.value)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-2xl border-2 px-3 py-2 text-left text-xs font-bold transition-colors',
+                    publishTheme === t.value
+                      ? 'border-brand-400 bg-brand-50 text-brand-800'
+                      : 'border-slate-100 bg-white text-slate-600 hover:border-brand-200',
+                  )}
+                >
+                  <span aria-hidden>{t.emoji}</span> {t.label}
+                </button>
+              ))}
+            </div>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-slate-700">Short description (optional)</span>
+            <textarea
+              value={publishDescription}
+              onChange={(e) => setPublishDescription(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="What is your story about?"
+              className="resize-none rounded-2xl border-2 border-slate-100 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100 focus:outline-none"
+            />
+          </label>
+
+          <Button
+            onClick={() =>
+              publishMutation.mutate({
+                description: publishDescription.trim(),
+                category: publishCategory,
+                theme: publishTheme,
+              })
+            }
+            disabled={publishMutation.isPending}
+            className="w-full"
+          >
+            {publishMutation.isPending ? 'Publishing…' : 'Publish story 🚀'}
+          </Button>
+        </div>
       </Modal>
     </div>
   )

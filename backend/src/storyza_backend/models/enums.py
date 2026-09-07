@@ -31,6 +31,7 @@ class AssignmentStatus(StrEnum):
 
 class ProjectStatus(StrEnum):
     DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
     SUBMITTED = "SUBMITTED"
     LOCKED = "LOCKED"
     ARCHIVED = "ARCHIVED"

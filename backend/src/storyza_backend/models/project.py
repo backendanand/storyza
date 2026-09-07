@@ -30,6 +30,9 @@ class Project(UUIDMixin, TimestampMixin, Base):
         ForeignKey("activities.id", ondelete="SET NULL"), nullable=True
     )
     scene_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    theme: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     owner: Mapped["User"] = relationship(back_populates="projects")
     versions: Mapped[list["ProjectVersion"]] = relationship(

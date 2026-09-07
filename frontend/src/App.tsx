@@ -5,6 +5,7 @@ import { AppShell } from './components/layout/AppShell'
 import { AccountPage } from './features/account/AccountPage'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
+import { CommunityPage } from './features/community/CommunityPage'
 import { HomePage } from './features/home/HomePage'
 import { StudioPage } from './features/studio/StudioPage'
 import { TeacherDashboard } from './features/teacher/TeacherDashboard'
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/community" element={<CommunityPage />} />
         <Route
           path="/account"
           element={

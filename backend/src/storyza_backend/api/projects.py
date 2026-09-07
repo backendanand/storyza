@@ -3,6 +3,7 @@ import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -157,6 +158,45 @@ async def update_project(
 ) -> Project:
     project = await _get_owned_project(db, user.id, project_id)
     project.title = title
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+class _PublishRequest(BaseModel):
+    description: str | None = Field(default=None, max_length=1000)
+    category: str | None = Field(default=None, max_length=64)
+    theme: str | None = Field(default=None, max_length=64)
+
+
+@router.post("/{project_id}/publish", response_model=ProjectRead)
+async def publish_project(
+    project_id: str,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    payload: _PublishRequest | None = None,
+) -> Project:
+    project = await _get_owned_project(db, user.id, project_id)
+    if project.status == ProjectStatus.LOCKED.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Project is locked")
+    if payload is not None:
+        project.description = payload.description
+        project.category = payload.category
+        project.theme = payload.theme
+    project.status = ProjectStatus.PUBLISHED.value
+    await db.commit()
+    await db.refresh(project)
+    return project
+
+
+@router.post("/{project_id}/unpublish", response_model=ProjectRead)
+async def unpublish_project(
+    project_id: str,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Project:
+    project = await _get_owned_project(db, user.id, project_id)
+    project.status = ProjectStatus.DRAFT.value
     await db.commit()
     await db.refresh(project)
     return project

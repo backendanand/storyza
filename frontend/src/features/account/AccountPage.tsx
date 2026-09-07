@@ -217,8 +217,8 @@ export function AccountPage() {
                         </p>
                       )}
                     </div>
-                    <Badge variant={project.status === 'published' ? 'success' : 'neutral'}>
-                      {project.status === 'published' ? 'Shared 🎉' : 'Draft ✏️'}
+                    <Badge variant={project.status === 'PUBLISHED' ? 'success' : 'neutral'}>
+                      {project.status === 'PUBLISHED' ? 'Shared 🎉' : 'Draft ✏️'}
                     </Badge>
                   </CardContent>
                 </Card>
